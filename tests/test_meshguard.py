@@ -1,26 +1,36 @@
 """
-test_meshguard - Exhaustive Unit Test Suite for MeshGuard.
-
-Tests:
-1. Crypto: RFC 7748 X25519 scalar mult, keypair generation, bit clamping, PSK, key validation.
-2. Models: Serialization to wg-quick format, systemd-networkd generation, CIDR host masking.
-3. Generator: Full-mesh synthesis, Hub-and-Spoke synthesis, NAT keepalive injection, file export.
-4. Auditor: Cryptokey Radix trie collision detection, duplicate IPs, MTU bounds, key mismatches, config parser.
-5. Visualizer: Terminal graph, node inventory table, routing matrix.
-6. CLI: Subcommands (init, keygen, generate, audit, visualize, export-systemd).
+Program: WireGuard Mesh Configurator - Test Suite
+Programmer: Ethan Kilmer
+Last Modified: 11/08/2026
+Purpose: Comprehensive unit and integration test suite verifying RFC 7748 Curve25519 cryptography, data models, full-mesh and hub-spoke synthesis, cryptokey routing collision detection, MTU boundaries, visualizer diagrams, and CLI commands.
 """
 
+## ---------------------------------------------------------------------------
+## Standard Library Imports
+## ---------------------------------------------------------------------------
+## Binary encoding utilities for base64 and hexadecimal conversions
 import base64
 import binascii
+## In-memory string streams for capturing standard output in tests
 import io
+## JSON serialization for blueprint verification
 import json
+## Operating system interfaces for file permissions and cleanup
 import os
+## Object-oriented filesystem path manipulation
 from pathlib import Path
+## High-level file operations for directory removal
 import shutil
+## System-level parameters and exit handlers
 import sys
+## Temporary directory and file generation for isolated test environments
 import tempfile
+## Python standard unittesting framework
 import unittest
 
+## ---------------------------------------------------------------------------
+## Internal Module Imports Under Test
+## ---------------------------------------------------------------------------
 from meshguard.crypto import (
     clamp_scalar,
     derive_public_key,
@@ -51,72 +61,85 @@ class TestCrypto(unittest.TestCase):
 
     def test_bit_clamping(self):
         """Checks RFC 7748 bit clamping rules (clearing bits 0,1,2,255 and setting bit 254)."""
+        ## Create a 32-byte test buffer filled with all 1s (0xFF)
         raw = bytearray([0xFF] * 32)
         clamped = clamp_scalar(bytes(raw))
 
-        # Bit 0, 1, 2 must be 0 (masked with 0xF8 = 248)
+        ## Byte 0 must have lowest 3 bits cleared: 0xFF & 0xF8 = 0xF8 (248)
         self.assertEqual(clamped[0], 0xF8)
-        # Bit 255 must be 0, Bit 254 must be 1 (0x7F & 0xFF | 0x40 = 0x40 | 0x7F = 0x7F & ~0x80 | 0x40 = 0x40 | 0x3F = 0x7F... wait:
-        # byte 31: 0xFF & 127 = 0x7F (01111111). 0x7F | 64 = 0x7F (01111111)
+
+        ## Byte 31 must have bit 255 cleared and bit 254 set:
+        ## 0xFF & 127 = 0x7F (01111111); 0x7F | 64 = 0x7F (127)
         self.assertEqual(clamped[31], 127)
 
-        # Test with all zeros
+        ## Test second edge case: 32-byte buffer of all zeros
         zero_raw = bytearray([0x00] * 32)
         zero_clamped = clamp_scalar(bytes(zero_raw))
+        ## Byte 0 remains 0
         self.assertEqual(zero_clamped[0], 0x00)
-        self.assertEqual(zero_clamped[31], 64)  # bit 254 is set
+        ## Byte 31 has bit 254 set (0 | 64 = 64)
+        self.assertEqual(zero_clamped[31], 64)
 
     def test_rfc7748_alice_vector(self):
         """Verifies scalar multiplication against RFC 7748 Section 6.1 Alice test vector."""
+        ## RFC 7748 Section 6.1 official test scalar for Alice
         alice_priv_hex = "77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a"
+        ## Decode hex string to bytes and clamp
         alice_priv_bytes = clamp_scalar(binascii.unhexlify(alice_priv_hex))
+        ## Compute scalar multiplication Q = scalar * G (where base point u = 9)
         alice_pub = x25519_scalar_mult(alice_priv_bytes, 9)
 
+        ## Official RFC 7748 expected public key for Alice
         expected_pub_hex = "8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a"
+        ## Assert exact match with RFC test vector
         self.assertEqual(binascii.hexlify(alice_pub).decode(), expected_pub_hex)
 
     def test_keypair_generation_and_derivation(self):
         """Ensures generated keys are valid and public key is deterministically derivable."""
+        ## Generate synchronized keypair
         priv, pub = generate_keypair()
 
-        # Validate formats
+        ## Validate Base64 formatting of private key
         valid_priv, msg_priv = validate_key_format(priv)
         self.assertTrue(valid_priv, msg_priv)
 
+        ## Validate Base64 formatting of public key
         valid_pub, msg_pub = validate_key_format(pub)
         self.assertTrue(valid_pub, msg_pub)
 
-        # Ensure public key derived from private key matches exactly
+        ## Derive public key from private key independently and assert mathematical identity
         derived = derive_public_key(priv)
         self.assertEqual(derived, pub)
 
     def test_preshared_key(self):
         """Verifies PSK generation and format."""
+        ## Generate symmetric preshared key
         psk = generate_preshared_key()
+        ## Validate that PSK conforms to 32-byte Base64 format
         valid, msg = validate_key_format(psk)
         self.assertTrue(valid, msg)
 
     def test_validate_key_format_invalid_inputs(self):
         """Tests rejection of malformed keys."""
-        # Non-string
+        ## Reject non-string data types
         valid, _ = validate_key_format(12345)  # type: ignore
         self.assertFalse(valid)
 
-        # Invalid length
+        ## Reject strings not matching 44 character length
         valid, _ = validate_key_format("too-short=")
         self.assertFalse(valid)
 
-        # Invalid base64 characters
+        ## Reject strings with invalid characters outside Base64 charset
         valid, _ = validate_key_format("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA*")
         self.assertFalse(valid)
 
-        # Null/zero key
+        ## Reject all-zero dummy placeholder keys
         zero_key = base64.b64encode(b"\x00" * 32).decode()
         valid, msg = validate_key_format(zero_key)
         self.assertFalse(valid)
         self.assertIn("placeholder", msg)
 
-        # Placeholder 'AAA...' key
+        ## Reject repetitive 'AAA...' dummy strings
         dummy_key = "A" * 43 + "="
         valid, msg = validate_key_format(dummy_key)
         self.assertFalse(valid)
@@ -127,6 +150,7 @@ class TestModels(unittest.TestCase):
 
     def test_wg_quick_block_serialization(self):
         """Tests serialization to wg-quick format."""
+        ## Define sample interface configuration
         iface = InterfaceConfig(
             private_key="a" * 43 + "=",
             addresses=["10.100.0.1/24", "fd00:mesh::1/64"],
@@ -135,6 +159,7 @@ class TestModels(unittest.TestCase):
             dns=["1.1.1.1"],
             post_up=["iptables -A FORWARD -i wg0 -j ACCEPT"],
         )
+        ## Define sample peer configuration
         peer = PeerConfig(
             public_key="b" * 43 + "=",
             allowed_ips=["10.100.0.2/32"],
@@ -142,9 +167,13 @@ class TestModels(unittest.TestCase):
             persistent_keepalive=25,
             comment="peer-02",
         )
+        ## Combine into top-level WireGuardConfig
         config = WireGuardConfig(interface=iface, peers=[peer])
 
+        ## Serialize to wg-quick format text
         serialized = config.to_wg_quick()
+
+        ## Verify [Interface] section directives
         self.assertIn("[Interface]", serialized)
         self.assertIn(f"PrivateKey = {iface.private_key}", serialized)
         self.assertIn("Address = 10.100.0.1/24", serialized)
@@ -152,6 +181,8 @@ class TestModels(unittest.TestCase):
         self.assertIn("MTU = 1420", serialized)
         self.assertIn("DNS = 1.1.1.1", serialized)
         self.assertIn("PostUp = iptables -A FORWARD -i wg0 -j ACCEPT", serialized)
+
+        ## Verify [Peer] section directives
         self.assertIn("[Peer]", serialized)
         self.assertIn(f"PublicKey = {peer.public_key}", serialized)
         self.assertIn("Endpoint = 198.51.100.2:51820", serialized)
@@ -173,14 +204,17 @@ class TestModels(unittest.TestCase):
         )
         config = WireGuardConfig(interface=iface, peers=[peer])
 
+        ## Generate systemd-networkd dictionary
         files = config.to_systemd_networkd("wg0")
         self.assertIn("wg0.netdev", files)
         self.assertIn("wg0.network", files)
 
+        ## Verify virtual device settings in .netdev
         netdev = files["wg0.netdev"]
         self.assertIn("Kind=wireguard", netdev)
         self.assertIn("[WireGuardPeer]", netdev)
 
+        ## Verify IP addressing in .network
         network = files["wg0.network"]
         self.assertIn("Address=10.100.0.1/24", network)
         self.assertIn("MTUBytes=1420", network)
@@ -194,8 +228,12 @@ class TestModels(unittest.TestCase):
             extra_allowed_ips=["192.168.1.0/24"],
         )
         routable = node.get_all_routable_ips()
+
+        ## IPv4 /24 subnet address must be converted to /32 host route for peer AllowedIPs
         self.assertIn("10.100.0.1/32", routable)
+        ## IPv6 /64 prefix address must be converted to /128 host route
         self.assertIn("fd00:42::1/128", routable)
+        ## Extra LAN subnet must be preserved verbatim
         self.assertIn("192.168.1.0/24", routable)
 
 
@@ -203,6 +241,7 @@ class TestGenerator(unittest.TestCase):
     """Verifies mesh generation algorithms."""
 
     def setUp(self):
+        ## Pre-generate fresh keypairs for testing
         self.priv1, self.pub1 = generate_keypair()
         self.priv2, self.pub2 = generate_keypair()
         self.priv3, self.pub3 = generate_keypair()
@@ -229,23 +268,24 @@ class TestGenerator(unittest.TestCase):
                 mesh_ips=["10.100.0.3/24"],
                 public_key=self.pub3,
                 private_key=self.priv3,
-                endpoint=None,  # Behind NAT
+                endpoint=None,  ## Node 3 is behind NAT
             ),
         ]
         mesh = MeshConfig(network_name="test-mesh", topology=TopologyType.FULL_MESH, nodes=nodes)
         gen = MeshGenerator(mesh)
         configs = gen.generate_all()
 
+        ## Must generate configs for all 3 nodes
         self.assertEqual(len(configs), 3)
 
-        # node-01 should have 2 peers (node-02 and node-03)
+        ## node-01 must have 2 peers (node-02 and node-03)
         conf1 = configs["node-01"]
         self.assertEqual(len(conf1.peers), 2)
         peer_keys = [p.public_key for p in conf1.peers]
         self.assertIn(self.pub2, peer_keys)
         self.assertIn(self.pub3, peer_keys)
 
-        # node-03 (behind NAT) connecting to node-01 (has endpoint) should have keepalive 25
+        ## node-03 (behind NAT) connecting to node-01 (public endpoint) must have keepalive 25
         conf3 = configs["node-03"]
         peer_to_1 = [p for p in conf3.peers if p.public_key == self.pub1][0]
         self.assertEqual(peer_to_1.persistent_keepalive, 25)
@@ -284,17 +324,17 @@ class TestGenerator(unittest.TestCase):
         gen = MeshGenerator(mesh)
         configs = gen.generate_all()
 
-        # Hub connects to spoke-01 and spoke-02 (2 peers)
+        ## Hub connects to spoke-01 and spoke-02 (2 peers)
         hub_conf = configs["hub"]
         self.assertEqual(len(hub_conf.peers), 2)
 
-        # Spoke-01 connects ONLY to Hub (1 peer)
+        ## Spoke-01 connects ONLY to Hub (1 peer)
         spoke1_conf = configs["spoke-01"]
         self.assertEqual(len(spoke1_conf.peers), 1)
         hub_peer = spoke1_conf.peers[0]
         self.assertEqual(hub_peer.public_key, self.pub1)
 
-        # The hub peer on spoke-01 MUST include spoke-02's IP so it routes through hub!
+        ## The hub peer on spoke-01 MUST include spoke-02's IP so it routes through hub!
         self.assertIn("10.100.0.1/32", hub_peer.allowed_ips)
         self.assertIn("10.100.0.3/32", hub_peer.allowed_ips)
 
@@ -319,13 +359,14 @@ class TestGenerator(unittest.TestCase):
         mesh = MeshConfig(network_name="export-mesh", nodes=nodes)
         gen = MeshGenerator(mesh)
 
+        ## Export into temporary directory
         with tempfile.TemporaryDirectory() as tmpdir:
             paths = gen.export_configs(tmpdir, interface_name="wg0", include_systemd_units=True)
             self.assertEqual(len(paths), 2)
             self.assertTrue(paths["node-a"].exists())
             self.assertTrue(paths["node-b"].exists())
 
-            # Check that systemd units exist
+            ## Verify systemd service unit and networkd files were created
             node_a_dir = Path(tmpdir) / "node-a"
             self.assertTrue((node_a_dir / "wg-quick@wg0.service").exists())
             self.assertTrue((node_a_dir / "systemd-networkd" / "wg0.netdev").exists())
@@ -342,15 +383,16 @@ class TestAuditor(unittest.TestCase):
     def test_allowed_ips_collision_on_interface(self):
         """Detects overlapping AllowedIPs across peers on the same interface."""
         iface = InterfaceConfig(private_key=self.priv1, addresses=["10.100.0.1/24"])
-        # Peer 1 claims 10.0.0.0/24
+        ## Peer 1 claims 10.0.0.0/24
         p1 = PeerConfig(public_key=self.pub1, allowed_ips=["10.0.0.0/24"])
-        # Peer 2 claims 10.0.0.5/32 (COLLISION!)
+        ## Peer 2 claims 10.0.0.5/32 (Subnet collision with Peer 1)
         p2 = PeerConfig(public_key=self.pub2, allowed_ips=["10.0.0.5/32"])
 
         config = WireGuardConfig(interface=iface, peers=[p1, p2])
         auditor = MeshAuditor()
         findings = auditor.audit_wireguard_config(config)
 
+        ## Filter collision findings
         collisions = [f for f in findings if f.rule_id == "COLLISION-001"]
         self.assertEqual(len(collisions), 1)
         self.assertEqual(collisions[0].severity, AuditSeverity.CRITICAL)
@@ -359,12 +401,13 @@ class TestAuditor(unittest.TestCase):
         """Detects duplicate IP allocation in declarative mesh blueprint."""
         nodes = [
             Node(name="box1", mesh_ips=["10.100.0.1/24"], public_key=self.pub1),
-            Node(name="box2", mesh_ips=["10.100.0.1/24"], public_key=self.pub2),  # Duplicate!
+            Node(name="box2", mesh_ips=["10.100.0.1/24"], public_key=self.pub2),  ## Duplicate IP allocation!
         ]
         mesh = MeshConfig(network_name="collision-mesh", nodes=nodes)
         auditor = MeshAuditor()
         findings = auditor.audit_mesh_config(mesh)
 
+        ## Assert duplicate IP error was caught
         dups = [f for f in findings if f.rule_id == "IP-001"]
         self.assertEqual(len(dups), 1)
         self.assertEqual(dups[0].severity, AuditSeverity.CRITICAL)
@@ -373,16 +416,16 @@ class TestAuditor(unittest.TestCase):
         """Verifies MTU < 1280 (ERROR) and MTU == 1500 (WARNING)."""
         auditor = MeshAuditor()
 
-        # MTU < 1280
+        ## Test MTU < 1280 (RFC 8200 IPv6 violation)
         auditor._audit_mtu(1200, "test-target")
         self.assertTrue(any(f.rule_id == "MTU-001" and f.severity == AuditSeverity.ERROR for f in auditor.findings))
 
-        # MTU == 1500
+        ## Test MTU == 1500 (High fragmentation warning)
         auditor.findings.clear()
         auditor._audit_mtu(1500, "test-target")
         self.assertTrue(any(f.rule_id == "MTU-002" and f.severity == AuditSeverity.WARNING for f in auditor.findings))
 
-        # MTU == 1420 (Valid)
+        ## Test MTU == 1420 (Optimal WireGuard standard)
         auditor.findings.clear()
         auditor._audit_mtu(1420, "test-target")
         self.assertEqual(len(auditor.findings), 0)
@@ -395,13 +438,14 @@ class TestAuditor(unittest.TestCase):
                 name="mismatched-node",
                 mesh_ips=["10.100.0.1/24"],
                 private_key=self.priv1,
-                public_key=other_pub,  # Mismatch!
+                public_key=other_pub,  ## Mismatched key pair!
             )
         ]
         mesh = MeshConfig(network_name="mismatch-mesh", nodes=nodes)
         auditor = MeshAuditor()
         findings = auditor.audit_mesh_config(mesh)
 
+        ## Assert mismatch was flagged as CRITICAL
         mismatches = [f for f in findings if f.rule_id == "KEY-003"]
         self.assertEqual(len(mismatches), 1)
         self.assertEqual(mismatches[0].severity, AuditSeverity.CRITICAL)
@@ -424,13 +468,17 @@ AllowedIPs = 10.100.0.2/32, 192.168.50.0/24
 Endpoint = 203.0.113.10:51820
 PersistentKeepalive = 25
 """
+        ## Parse configuration string
         config = MeshAuditor.parse_wg_conf(sample_conf)
+
+        ## Verify [Interface] fields
         self.assertEqual(config.interface.private_key, self.priv1)
         self.assertEqual(len(config.interface.addresses), 2)
         self.assertEqual(config.interface.listen_port, 51820)
         self.assertEqual(config.interface.mtu, 1420)
-        self.assertEqual(len(config.peers), 1)
 
+        ## Verify [Peer] fields
+        self.assertEqual(len(config.peers), 1)
         peer = config.peers[0]
         self.assertEqual(peer.public_key, self.pub2)
         self.assertEqual(len(peer.allowed_ips), 2)
@@ -442,16 +490,16 @@ PersistentKeepalive = 25
         """Checks validation of endpoints and UDP port numbers."""
         auditor = MeshAuditor()
 
-        # Missing port
+        ## Endpoint missing port component
         auditor._audit_endpoint("vpn.example.com", "test-ep")
         self.assertTrue(any(f.rule_id == "EP-001" for f in auditor.findings))
 
-        # Port out of range
+        ## Endpoint with out-of-range port number (> 65535)
         auditor.findings.clear()
         auditor._audit_endpoint("vpn.example.com:70000", "test-ep")
         self.assertTrue(any(f.rule_id == "EP-004" for f in auditor.findings))
 
-        # Valid IPv6 endpoint
+        ## Valid bracketed IPv6 endpoint
         auditor.findings.clear()
         auditor._audit_endpoint("[2001:db8::1]:51820", "test-ep")
         self.assertEqual(len(auditor.findings), 0)
@@ -460,12 +508,13 @@ PersistentKeepalive = 25
         """Detects insecure (group/world-readable) file permissions."""
         with tempfile.NamedTemporaryFile(suffix=".conf") as tf:
             path = Path(tf.name)
-            path.chmod(0o644)  # Insecure permissions
+            ## Set world-readable permissions (0644)
+            path.chmod(0o644)
             auditor = MeshAuditor()
             auditor._audit_file_permissions(path)
             self.assertTrue(any(f.rule_id == "SEC-001" and f.severity == AuditSeverity.CRITICAL for f in auditor.findings))
 
-            # Chmod 600 should pass cleanly
+            ## Update to secure permissions (0600) and verify clean audit
             path.chmod(0o600)
             auditor.findings.clear()
             auditor._audit_file_permissions(path)
@@ -487,6 +536,7 @@ class TestVisualizer(unittest.TestCase):
         vis = MeshVisualizer(mesh)
         output = vis.render_all()
 
+        ## Verify visual component sections are rendered
         self.assertIn("WIREGUARD MESH TOPOLOGY", output)
         self.assertIn("NODE INVENTORY", output)
         self.assertIn("CONNECTIVITY DIAGRAM", output)
@@ -504,35 +554,35 @@ class TestCLI(unittest.TestCase):
             mesh_json = Path(tmpdir) / "mesh.json"
             out_dir = Path(tmpdir) / "configs"
 
-            # 1. Init
+            ## 1. Execute 'init' command
             rc_init = main(["init", "--output", str(mesh_json), "--nodes", "3"])
             self.assertEqual(rc_init, 0)
             self.assertTrue(mesh_json.exists())
 
-            # 2. Visualize
+            ## 2. Execute 'visualize' command
             rc_vis = main(["visualize", "--config", str(mesh_json)])
             self.assertEqual(rc_vis, 0)
 
-            # 3. Generate
+            ## 3. Execute 'generate' command
             rc_gen = main(["generate", "--config", str(mesh_json), "--output-dir", str(out_dir)])
             self.assertEqual(rc_gen, 0)
             self.assertTrue((out_dir / "node-01" / "wg0.conf").exists())
 
-            # 4. Audit generated directory
+            ## 4. Execute 'audit' command on generated directory
             rc_audit = main(["audit", "--dir", str(out_dir)])
             self.assertEqual(rc_audit, 0)
 
     def test_cli_keygen(self):
         """Verifies CLI keygen commands."""
-        # Test keypair generation
+        ## Test standard keypair generation
         rc_key = main(["keygen"])
         self.assertEqual(rc_key, 0)
 
-        # Test PSK generation
+        ## Test symmetric PSK generation
         rc_psk = main(["keygen", "--psk"])
         self.assertEqual(rc_psk, 0)
 
-        # Test public key derivation
+        ## Test public key derivation from private key
         priv, pub = generate_keypair()
         rc_derive = main(["keygen", "--derive-public", priv])
         self.assertEqual(rc_derive, 0)
@@ -544,4 +594,5 @@ class TestCLI(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    ## Run all unit tests with default test runner
     unittest.main()

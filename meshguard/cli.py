@@ -1,21 +1,27 @@
 """
-meshguard.cli - Command-Line Interface for WireGuard Mesh Generation and Auditing.
-
-Provides subcommands:
-- init: Create a starter mesh.json blueprint.
-- keygen: Generate RFC 7748 Curve25519 WireGuard keypairs or PSKs.
-- generate: Synthesize synchronized .conf files for full-mesh or hub-and-spoke topologies.
-- audit: Inspect configuration files or blueprints for subnet collisions, MTU faults, and weak keys.
-- visualize: Print terminal ASCII connectivity graphs and routing matrices.
-- export-systemd: Generate Linux systemd service units or networkd configurations.
+Program: WireGuard Mesh Configurator - Command-Line Interface
+Programmer: Ethan Kilmer
+Last Modified: 11/08/2026
+Purpose: Command-line interface dispatcher supporting mesh blueprint initialization, pure-Python key generation, configuration compilation, routing collision auditing, topology visualization, and Linux systemd service unit export.
 """
 
+## ---------------------------------------------------------------------------
+## Standard Library Imports
+## ---------------------------------------------------------------------------
+## Command-line argument parsing library
 import argparse
+## JSON data serialization and parsing
 import json
+## Object-oriented filesystem path manipulation
 from pathlib import Path
+## System module for process exit codes and standard error streams
 import sys
+## Type hinting annotations
 from typing import List, Optional
 
+## ---------------------------------------------------------------------------
+## Internal Model, Cryptographic & Orchestration Imports
+## ---------------------------------------------------------------------------
 from meshguard.crypto import (
     generate_keypair,
     generate_preshared_key,
@@ -30,6 +36,7 @@ from meshguard.models import TopologyType, AuditSeverity
 
 def build_parser() -> argparse.ArgumentParser:
     """Builds the top-level argument parser with subcommands."""
+    ## Create root CLI argument parser
     parser = argparse.ArgumentParser(
         prog="meshguard",
         description=(
@@ -37,11 +44,12 @@ def build_parser() -> argparse.ArgumentParser:
             "topology visualizer, and subnet collision audit engine."
         ),
     )
+    ## Create subparser collection for distinct CLI actions
     subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
 
-    # -------------------------------------------------------------------------
-    # init
-    # -------------------------------------------------------------------------
+    ## -----------------------------------------------------------------------
+    ## Subcommand: init
+    ## -----------------------------------------------------------------------
     init_parser = subparsers.add_parser("init", help="Generate a starter mesh blueprint JSON file")
     init_parser.add_argument(
         "--output",
@@ -65,9 +73,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Number of initial sample nodes to create (default: 3)",
     )
 
-    # -------------------------------------------------------------------------
-    # keygen
-    # -------------------------------------------------------------------------
+    ## -----------------------------------------------------------------------
+    ## Subcommand: keygen
+    ## -----------------------------------------------------------------------
     keygen_parser = subparsers.add_parser(
         "keygen",
         help="Generate Curve25519 WireGuard keypairs or PresharedKeys in pure Python",
@@ -84,9 +92,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Derive public key from an existing Base64 private key",
     )
 
-    # -------------------------------------------------------------------------
-    # generate
-    # -------------------------------------------------------------------------
+    ## -----------------------------------------------------------------------
+    ## Subcommand: generate
+    ## -----------------------------------------------------------------------
     gen_parser = subparsers.add_parser(
         "generate",
         help="Synthesize synchronized WireGuard configs from a mesh blueprint",
@@ -118,9 +126,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Omit generating systemd service and networkd units",
     )
 
-    # -------------------------------------------------------------------------
-    # audit
-    # -------------------------------------------------------------------------
+    ## -----------------------------------------------------------------------
+    ## Subcommand: audit
+    ## -----------------------------------------------------------------------
     audit_parser = subparsers.add_parser(
         "audit",
         help="Audit configurations or blueprints for subnet collisions, MTU risks, and key errors",
@@ -145,9 +153,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Audit a single WireGuard configuration file",
     )
 
-    # -------------------------------------------------------------------------
-    # visualize
-    # -------------------------------------------------------------------------
+    ## -----------------------------------------------------------------------
+    ## Subcommand: visualize
+    ## -----------------------------------------------------------------------
     vis_parser = subparsers.add_parser(
         "visualize",
         help="Render ASCII topology diagrams and routing matrices in terminal",
@@ -160,9 +168,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to declarative mesh blueprint JSON file",
     )
 
-    # -------------------------------------------------------------------------
-    # export-systemd
-    # -------------------------------------------------------------------------
+    ## -----------------------------------------------------------------------
+    ## Subcommand: export-systemd
+    ## -----------------------------------------------------------------------
     sysd_parser = subparsers.add_parser(
         "export-systemd",
         help="Print hardened Linux systemd service unit template for an interface",
@@ -175,19 +183,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="Interface name (default: wg0)",
     )
 
+    ## Return fully wired parser
     return parser
 
 
 def cmd_init(args: argparse.Namespace) -> int:
     """Creates a starter blueprint with freshly generated keys."""
     out_path = Path(args.output)
+
+    ## Guard against accidental overwrite of an existing blueprint
     if out_path.exists():
         print(f"Error: Target file '{out_path}' already exists. Refusing to overwrite.", file=sys.stderr)
         return 1
 
     nodes = []
+    ## Guarantee a minimum of 2 nodes for meaningful mesh networking
     num_nodes = max(2, args.nodes)
 
+    ## Generate sample nodes with fresh Curve25519 keypairs
     for i in range(1, num_nodes + 1):
         priv, pub = generate_keypair()
         is_hub = (args.topology == "hub_and_spoke" and i == 1)
@@ -205,6 +218,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         }
         nodes.append(node_def)
 
+    ## Assemble sample declarative mesh blueprint dictionary
     sample_mesh = {
         "network_name": "homelab-mesh",
         "topology": args.topology,
@@ -214,6 +228,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         "nodes": nodes,
     }
 
+    ## Write formatted JSON to the designated output path
     out_path.write_text(json.dumps(sample_mesh, indent=2) + "\n", encoding="utf-8")
     print(f"✓ Initialized sample {args.topology} blueprint with {num_nodes} nodes at: {out_path}")
     print("  Run 'meshguard visualize --config mesh.json' to view topology.")
@@ -223,11 +238,13 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 def cmd_keygen(args: argparse.Namespace) -> int:
     """Handles key generation and derivation."""
+    ## 1. PresharedKey generation mode
     if args.psk:
         psk = generate_preshared_key()
         print(f"PresharedKey = {psk}")
         return 0
 
+    ## 2. Public key derivation mode
     if args.derive_public:
         priv = args.derive_public.strip()
         try:
@@ -238,6 +255,7 @@ def cmd_keygen(args: argparse.Namespace) -> int:
             print(f"Error deriving public key: {e}", file=sys.stderr)
             return 1
 
+    ## 3. Standard synchronized keypair generation mode
     priv, pub = generate_keypair()
     print(f"PrivateKey = {priv}")
     print(f"PublicKey  = {pub}")
@@ -246,6 +264,7 @@ def cmd_keygen(args: argparse.Namespace) -> int:
 
 def cmd_generate(args: argparse.Namespace) -> int:
     """Compiles a mesh blueprint into deployment files."""
+    ## Load and parse declarative blueprint
     try:
         gen = MeshGenerator.from_json_file(args.config)
     except Exception as e:
@@ -254,12 +273,15 @@ def cmd_generate(args: argparse.Namespace) -> int:
 
     out_dir = Path(args.output_dir)
     include_systemd = not args.no_systemd
+
+    ## Execute file export
     results = gen.export_configs(
         output_dir=out_dir,
         interface_name=args.interface,
         include_systemd_units=include_systemd,
     )
 
+    ## Print compilation summary
     print(f"✓ Successfully synthesized WireGuard mesh '{gen.config.network_name}':")
     print(f"  Topology: {gen.config.topology.value}")
     print(f"  Interface: {args.interface}")
@@ -276,6 +298,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
     auditor = MeshAuditor()
     findings = []
 
+    ## Case 1: Audit high-level JSON blueprint
     if args.config:
         try:
             gen = MeshGenerator.from_json_file(args.config)
@@ -283,6 +306,8 @@ def cmd_audit(args: argparse.Namespace) -> int:
         except Exception as e:
             print(f"Failed to audit blueprint: {e}", file=sys.stderr)
             return 1
+
+    ## Case 2: Audit individual .conf file
     elif args.file:
         try:
             wg_conf = auditor.parse_wg_conf_file(args.file)
@@ -290,6 +315,8 @@ def cmd_audit(args: argparse.Namespace) -> int:
         except Exception as e:
             print(f"Failed to audit config file: {e}", file=sys.stderr)
             return 1
+
+    ## Case 3: Audit directory of .conf files
     elif args.dir:
         try:
             findings = auditor.audit_directory(args.dir)
@@ -297,11 +324,12 @@ def cmd_audit(args: argparse.Namespace) -> int:
             print(f"Failed to audit directory: {e}", file=sys.stderr)
             return 1
 
+    ## Clean audit result
     if not findings:
         print("✓ All audit checks passed! No subnet collisions, key faults, or MTU anomalies detected.")
         return 0
 
-    # Summary by severity
+    ## Compute summary metrics by severity
     critical_count = sum(1 for f in findings if f.severity == AuditSeverity.CRITICAL)
     error_count = sum(1 for f in findings if f.severity == AuditSeverity.ERROR)
     warn_count = sum(1 for f in findings if f.severity == AuditSeverity.WARNING)
@@ -312,10 +340,12 @@ def cmd_audit(args: argparse.Namespace) -> int:
     print(f" CRITICAL: {critical_count} | ERROR: {error_count} | WARNING: {warn_count} | INFO: {info_count}")
     print("=" * 70)
 
+    ## Print individual findings
     for f in findings:
         print(f.to_display_string())
         print("-" * 70)
 
+    ## Fail with non-zero exit code if CRITICAL or ERROR findings exist
     if critical_count > 0 or error_count > 0:
         return 1
     return 0
@@ -323,12 +353,14 @@ def cmd_audit(args: argparse.Namespace) -> int:
 
 def cmd_visualize(args: argparse.Namespace) -> int:
     """Renders ASCII visual diagrams."""
+    ## Load blueprint
     try:
         gen = MeshGenerator.from_json_file(args.config)
     except Exception as e:
         print(f"Error loading mesh blueprint: {e}", file=sys.stderr)
         return 1
 
+    ## Render diagnostic visuals
     visualizer = MeshVisualizer(gen.config)
     print(visualizer.render_all())
     return 0
@@ -336,6 +368,7 @@ def cmd_visualize(args: argparse.Namespace) -> int:
 
 def cmd_export_systemd(args: argparse.Namespace) -> int:
     """Prints systemd service unit template."""
+    ## Generate production systemd unit string
     unit = MeshGenerator.generate_systemd_service_unit(args.interface)
     print(unit)
     return 0
@@ -343,13 +376,16 @@ def cmd_export_systemd(args: argparse.Namespace) -> int:
 
 def main(argv: Optional[List[str]] = None) -> int:
     """CLI entrypoint."""
+    ## Build argument parser and parse incoming arguments
     parser = build_parser()
     args = parser.parse_args(argv)
 
+    ## If no subcommand specified, display help and return cleanly
     if not args.command:
         parser.print_help()
         return 0
 
+    ## Dispatch to appropriate command handler
     if args.command == "init":
         return cmd_init(args)
     elif args.command == "keygen":
@@ -367,4 +403,5 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 
 if __name__ == "__main__":
+    ## Execute entrypoint when run as standalone script
     sys.exit(main())

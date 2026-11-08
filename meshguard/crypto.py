@@ -1,69 +1,40 @@
 """
-meshguard.crypto - Pure-Python RFC 7748 Curve25519 Keypair Engine & Validator.
-
-This module provides zero-dependency cryptographic operations for WireGuard networks:
-1. RFC 7748 X25519 scalar multiplication to derive Curve25519 public keys from private keys.
-2. Cryptographically secure private key generation with standard Curve25519 bit-clamping.
-3. WireGuard PresharedKey (PSK) generation for post-quantum resistance.
-4. Base64 encoding/decoding validation for 32-byte cryptographic keys.
-
-===============================================================================
-THE MATHEMATICAL ARCHITECTURE OF WIREGUARD KEYS (RFC 7748 & RFC 7539):
-===============================================================================
-WireGuard utilizes the Noise Protocol Framework (Noise_IKpsk2_25519_ChaChaPoly_BLAKE2s).
-Every node in the network is identified solely by its static 32-byte (256-bit)
-Curve25519 public key.
-
-1. The Curve:
-   Curve25519 is a Montgomery curve defined over the prime field GF(2^255 - 19):
-       y^2 = x^3 + 486662 * x^2 + x
-
-2. Montgomery Ladder & X-Coordinate Only:
-   Instead of computing full (x, y) coordinates on a Weierstrass curve, RFC 7748
-   multiplication operates exclusively on the x-coordinate (u-coordinate).
-   The Montgomery ladder computes scalar multiplication Q = k * P in a fixed
-   sequence of additions and doublings, avoiding data-dependent branching.
-
-3. Key Clamping (RFC 7748 Section 5):
-   A raw 32-byte random string cannot be used directly as a Curve25519 scalar.
-   It must undergo bit-clamping:
-       k[0]  &= 248  (0b11111000): Clears the lowest 3 bits. This guarantees that
-                                   the scalar is a multiple of 8 (the curve cofactor).
-                                   This neutralizes small-subgroup attacks where an
-                                   adversary supplies a low-order curve point to
-                                   glean modular residues of the private key.
-       k[31] &= 127  (0b01111111): Clears bit 255 to keep the scalar within field bounds.
-       k[31] |= 64   (0b01000000): Sets bit 254 to ensure the scalar always has a fixed
-                                   bit length (254 bits), preventing variable-length
-                                   timing leaks in naive Montgomery ladder loops.
-
-4. Base64 Representation:
-   A 32-byte binary key is serialized for `wg` and `wg-quick` configuration files as
-   a standard Base64 string of length 44 ending with an equals sign ('='):
-       ceil(32 * 8 / 6) = 44 characters (32 bytes * 4/3 = 42.66 -> padded to 44).
+Program: WireGuard Mesh Configurator - Pure-Python RFC 7748 Curve25519 Engine
+Programmer: Ethan Kilmer
+Last Modified: 11/08/2026
+Purpose: Pure-Python RFC 7748 Curve25519 keypair generation, public key derivation via Montgomery ladder, bit-clamping, preshared key generation, and WireGuard key validation without external dependencies.
 """
 
+## ---------------------------------------------------------------------------
+## Standard Library Imports
+## ---------------------------------------------------------------------------
+## Binary-to-ASCII encoding library for Base64 serialization of 32-byte keys
 import base64
+## Operating system interface for secure entropy access
 import os
+## Regular expression matching engine for format and character set validation
 import re
+## Cryptographically secure pseudo-random number generator (CSPRNG)
 import secrets
+## Type hinting annotations for tuple return types
 from typing import Tuple
 
-# -----------------------------------------------------------------------------
-# RFC 7748 Field Arithmetic Constants
-# -----------------------------------------------------------------------------
-# Prime modulus: p = 2^255 - 19
-# In hexadecimal: 0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffed
+## ---------------------------------------------------------------------------
+## RFC 7748 Field Arithmetic Constants
+## ---------------------------------------------------------------------------
+## Prime modulus p for Curve25519: p = 2^255 - 19
+## In hexadecimal: 0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffed
 FIELD_PRIME: int = (1 << 255) - 19
 
-# Montgomery curve constant: (A - 2) / 4 where A = 486662
-# (486662 - 2) / 4 = 121665
+## Montgomery curve constant (A - 2) / 4 where A = 486662
+## (486662 - 2) / 4 = 121665; used for point doubling in the Montgomery ladder
 A24: int = 121665
 
-# Standard generator u-coordinate (base point) for Curve25519 (u = 9)
+## Standard generator u-coordinate (base point) for Curve25519 (u = 9)
 GENERATOR_U: int = 9
 
-# Regex pattern for WireGuard base64 32-byte key: 43 base64 characters + '=' padding
+## Regular expression pattern validating WireGuard Base64 key structure:
+## Exactly 43 alphanumeric or '+' or '/' characters followed by '=' padding (44 chars total)
 KEY_B64_REGEX: re.Pattern = re.compile(r"^[A-Za-z0-9+/]{43}=$")
 
 
@@ -85,21 +56,26 @@ def clamp_scalar(scalar_bytes: bytes) -> bytes:
     Raises:
         ValueError: If input is not exactly 32 bytes in length.
     """
+    ## Verify that the incoming byte buffer is exactly 32 bytes (256 bits)
     if len(scalar_bytes) != 32:
         raise ValueError(f"Scalar must be exactly 32 bytes, received {len(scalar_bytes)} bytes.")
 
-    # Convert immutable bytes into a mutable bytearray
+    ## Convert immutable bytes into a mutable bytearray for in-place bitwise masking
     clamped = bytearray(scalar_bytes)
 
-    # Clear lowest 3 bits: mask with 11111000 in binary (0xF8 or 248)
+    ## Clear the lowest 3 bits of byte 0: mask with 0xF8 (11111000 in binary, or 248)
+    ## This ensures the scalar is a multiple of 8, neutralizing small-subgroup attacks.
     clamped[0] &= 248
 
-    # Clear bit 255: mask with 01111111 in binary (0x7F or 127)
+    ## Clear bit 255 (the most significant bit of byte 31): mask with 0x7F (01111111, or 127)
+    ## Keeps the scalar strictly within the field size bound.
     clamped[31] &= 127
 
-    # Set bit 254: bitwise OR with 01000000 in binary (0x40 or 64)
+    ## Set bit 254 (second highest bit of byte 31): bitwise OR with 0x40 (01000000, or 64)
+    ## Guarantees a constant bit-length of 254 bits, preventing timing leaks.
     clamped[31] |= 64
 
+    ## Return the sanitized byte sequence as an immutable bytes object
     return bytes(clamped)
 
 
@@ -115,9 +91,16 @@ def _conditional_swap(swap: int, x_2: int, x_3: int) -> Tuple[int, int]:
         x_2 = x_2 - dummy
         x_3 = x_3 + dummy
     """
+    ## Compute difference scaled by the swap flag (0 or 1) in the prime field
     dummy = (swap * (x_2 - x_3)) % FIELD_PRIME
+
+    ## If swap is 1, x_2 becomes x_2 - (x_2 - x_3) = x_3; if swap is 0, x_2 is unchanged
     x_2 = (x_2 - dummy) % FIELD_PRIME
+
+    ## If swap is 1, x_3 becomes x_3 + (x_2 - x_3) = x_2; if swap is 0, x_3 is unchanged
     x_3 = (x_3 + dummy) % FIELD_PRIME
+
+    ## Return the conditionally swapped coordinate pair
     return x_2, x_3
 
 
@@ -135,50 +118,71 @@ def x25519_scalar_mult(scalar_bytes: bytes, u_coord: int = GENERATOR_U) -> bytes
     Returns:
         32-byte little-endian encoded u-coordinate of the resulting public key.
     """
-    # Parse scalar as a 256-bit little-endian integer
+    ## Decode the 32-byte clamped scalar into a 256-bit little-endian integer
     k = int.from_bytes(scalar_bytes, byteorder="little")
 
+    ## Initialize Montgomery ladder state variables in projective coordinates (X : Z)
+    ## Point P: (x_1 : 1) where x_1 is the input base point u-coordinate
     x_1 = u_coord
+    ## Accumulator point Q: initialized to point at infinity (1 : 0)
     x_2 = 1
     z_2 = 0
+    ## Working point Q + P: initialized to base point (u : 1)
     x_3 = u_coord
     z_3 = 1
+    ## Swap flag to maintain constant-time coordinate ordering
     swap = 0
 
-    # Montgomery ladder: iterate over bits from bit 254 down to bit 0
+    ## Loop over all 255 bits from bit 254 down to bit 0 (RFC 7748 Section 5)
     for t in reversed(range(255)):
+        ## Extract the t-th bit of scalar k
         k_t = (k >> t) & 1
+
+        ## Update swap flag and conditionally swap coordinates if bit changed
         swap ^= k_t
         x_2, x_3 = _conditional_swap(swap, x_2, x_3)
         z_2, z_3 = _conditional_swap(swap, z_2, z_3)
         swap = k_t
 
-        # Differential addition and doubling formulas for Montgomery curves
+        ## Compute differential addition and point doubling on Montgomery curve
+        ## a_val = x_2 + z_2
         a_val = (x_2 + z_2) % FIELD_PRIME
+        ## aa_val = a_val^2
         aa_val = (a_val * a_val) % FIELD_PRIME
+        ## b_val = x_2 - z_2
         b_val = (x_2 - z_2) % FIELD_PRIME
+        ## bb_val = b_val^2
         bb_val = (b_val * b_val) % FIELD_PRIME
+        ## e_val = aa_val - bb_val
         e_val = (aa_val - bb_val) % FIELD_PRIME
+        ## c_val = x_3 + z_3
         c_val = (x_3 + z_3) % FIELD_PRIME
+        ## d_val = x_3 - z_3
         d_val = (x_3 - z_3) % FIELD_PRIME
+        ## da_val = d_val * a_val
         da_val = (d_val * a_val) % FIELD_PRIME
+        ## cb_val = c_val * b_val
         cb_val = (c_val * b_val) % FIELD_PRIME
 
+        ## Compute new coordinates for working point (Q + P)
         x_3 = ((da_val + cb_val) ** 2) % FIELD_PRIME
         z_3 = (x_1 * ((da_val - cb_val) ** 2)) % FIELD_PRIME
+        ## Compute new coordinates for doubled point (2Q)
         x_2 = (aa_val * bb_val) % FIELD_PRIME
         z_2 = (e_val * (aa_val + A24 * e_val)) % FIELD_PRIME
 
-    # Final conditional swap to restore correct coordinate order
+    ## Perform final swap to place final result coordinates into (x_2, z_2)
     x_2, x_3 = _conditional_swap(swap, x_2, x_3)
     z_2, z_3 = _conditional_swap(swap, z_2, z_3)
 
-    # Invert z_2 modulo FIELD_PRIME using Fermat's Little Theorem:
-    # z_2^(p - 1) = 1 (mod p) => z_2^(p - 2) = z_2^(-1) (mod p)
+    ## Compute modular multiplicative inverse of z_2 modulo p using Fermat's Little Theorem:
+    ## Since p is prime, z_2^(p - 1) = 1 (mod p), so z_2^(p - 2) = z_2^(-1) (mod p).
     z_2_inv = pow(z_2, FIELD_PRIME - 2, FIELD_PRIME)
+
+    ## Convert projective coordinate (x_2 : z_2) back to affine u-coordinate: u = x_2 * z_2^(-1)
     result_x = (x_2 * z_2_inv) % FIELD_PRIME
 
-    # Serialize to 32 bytes little-endian per RFC 7748
+    ## Serialize the 256-bit integer into 32 little-endian bytes per RFC 7748 specification
     return result_x.to_bytes(32, byteorder="little")
 
 
@@ -192,11 +196,13 @@ def generate_private_key() -> str:
     Returns:
         Base64-encoded 44-character string representing the private key.
     """
-    # 32 bytes (256 bits) of cryptographic entropy
+    ## Gather 32 bytes (256 bits) of cryptographically secure random entropy
     raw_entropy = secrets.token_bytes(32)
-    # Clamp scalar to safe Curve25519 subgroup
+
+    ## Enforce RFC 7748 bit clamping on the random scalar
     clamped = clamp_scalar(raw_entropy)
-    # Encode to standard base64 string
+
+    ## Encode the 32 clamped bytes into a standard 44-character Base64 string
     return base64.b64encode(clamped).decode("ascii")
 
 
@@ -216,15 +222,21 @@ def derive_public_key(private_key_b64: str) -> str:
     Raises:
         ValueError: If the key format is invalid.
     """
+    ## Validate that the incoming private key matches WireGuard length and character rules
     is_valid, err = validate_key_format(private_key_b64)
     if not is_valid:
         raise ValueError(f"Invalid private key: {err}")
 
+    ## Decode Base64 string into raw 32 binary bytes
     raw_priv = base64.b64decode(private_key_b64)
-    # Apply clamping to ensure canonical scalar
+
+    ## Apply RFC 7748 clamping to ensure canonical Curve25519 scalar properties
     clamped_priv = clamp_scalar(raw_priv)
-    # Calculate scalar multiplication: pub = priv * G
+
+    ## Perform scalar multiplication against Curve25519 base point (u = 9)
     pub_bytes = x25519_scalar_mult(clamped_priv, GENERATOR_U)
+
+    ## Encode public key bytes into standard 44-character Base64 representation
     return base64.b64encode(pub_bytes).decode("ascii")
 
 
@@ -235,8 +247,13 @@ def generate_keypair() -> Tuple[str, str]:
     Returns:
         Tuple of (private_key_b64, public_key_b64).
     """
+    ## Generate clamped random private key
     priv = generate_private_key()
+
+    ## Compute corresponding Curve25519 public key
     pub = derive_public_key(priv)
+
+    ## Return both keys as a paired tuple
     return priv, pub
 
 
@@ -252,7 +269,10 @@ def generate_preshared_key() -> str:
     Returns:
         Base64-encoded 44-character string of 32 random bytes.
     """
+    ## Gather 32 bytes of secure random symmetric key material
     psk_bytes = secrets.token_bytes(32)
+
+    ## Encode symmetric key material to Base64 format
     return base64.b64encode(psk_bytes).decode("ascii")
 
 
@@ -272,29 +292,38 @@ def validate_key_format(key_str: str) -> Tuple[bool, str]:
     Returns:
         Tuple of (is_valid: bool, error_message: str).
     """
+    ## Guard against non-string input types
     if not isinstance(key_str, str):
         return False, f"Key must be a string, got {type(key_str).__name__}"
 
+    ## Remove leading/trailing whitespace
     stripped = key_str.strip()
+
+    ## WireGuard keys must be exactly 44 characters long
     if len(stripped) != 44:
         return False, f"Key length is {len(stripped)} characters; WireGuard keys must be 44 characters."
 
+    ## Validate character set against standard Base64 pattern ending with '='
     if not KEY_B64_REGEX.match(stripped):
         return False, "Key does not match Base64 pattern (43 alphanumeric/+/_ chars followed by '=')"
 
+    ## Attempt to decode Base64 string to verify padding and binary integrity
     try:
         raw = base64.b64decode(stripped, validate=True)
     except Exception as exc:
         return False, f"Base64 decoding failed: {exc}"
 
+    ## WireGuard Curve25519 keys must decode to exactly 32 binary bytes
     if len(raw) != 32:
         return False, f"Decoded key is {len(raw)} bytes; must be exactly 32 bytes."
 
-    # Check for suspicious null/placeholder keys
+    ## Detect trivial placeholder key consisting of 32 zero bytes
     if raw == b"\x00" * 32:
         return False, "Key is all zeros (placeholder/dummy key detected)"
 
+    ## Detect trivial unconfigured placeholder string consisting of repeated 'A's
     if stripped.startswith("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"):
         return False, "Key is a trivial placeholder string ('AAA...')"
 
+    ## Key satisfies all syntactic and structural invariants
     return True, ""

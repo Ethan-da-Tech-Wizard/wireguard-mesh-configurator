@@ -1,62 +1,29 @@
 """
-meshguard.auditor - Subnet Collision Detector, MTU Verifier, and WireGuard Syntax Auditor.
-
-This module inspects WireGuard configuration files (.conf) and mesh blueprints
-to detect protocol violations, routing collisions, and operational hazards.
-
-===============================================================================
-THE FIVE DEADLY SINS OF WIREGUARD DEPLOYMENT:
-===============================================================================
-1. Overlapping AllowedIPs on the Same Interface:
-   WireGuard does NOT load-balance between peers with overlapping AllowedIPs.
-   WireGuard uses an internal Radix trie (longest-prefix match).
-   If Peer A has 10.0.0.0/24 and Peer B has 10.0.0.5/32:
-   - Outbound traffic to 10.0.0.5 will route to Peer B.
-   - Inbound traffic from 10.0.0.5 encrypted by Peer A will be SILENTLY DROPPED
-     by the kernel because of cryptokey anti-spoofing lookup mismatch!
-   - If two peers specify the EXACT same subnet (e.g. both claim 10.0.0.2/32),
-     only ONE peer will receive the route in the kernel; the other is permanently
-     orphaned without an error code from `wg`.
-
-2. MTU Misconfiguration & Path MTU (PMTU) Blackholes:
-   Standard Ethernet frames are 1500 bytes.
-   WireGuard encapsulates IP packets inside UDP datagrams.
-   Overhead breakdown:
-     - Outer IP header: 20 bytes (IPv4) or 40 bytes (IPv6)
-     - UDP header: 8 bytes
-     - WireGuard encapsulation header: 32 bytes (Type, Receiver, Counter, Poly1305 MAC)
-     Total WireGuard overhead = 60 bytes (IPv4) or 80 bytes (IPv6).
-   If MTU is set to 1500:
-   - Encapsulated UDP packets become 1560 or 1580 bytes.
-   - Routers on the internet must fragment the packet.
-   - Many firewalls drop UDP fragments (security evasion prevention).
-   - If DF (Don't Fragment) is set and intermediate routers drop ICMP Type 3 Code 4
-     ("Destination Unreachable: Fragmentation Needed"), connections hang during
-     TLS handshakes or large HTTP transfers. This is a classic PMTU blackhole!
-   - Recommended MTU: 1420 (accommodates 1500 - 80 = 1420 bytes for IPv6 + PPPoE).
-   - Absolute Minimum MTU: 1280 (RFC 8200 mandates IPv6 MTU >= 1280).
-
-3. Insecure File Permissions:
-   WireGuard configuration files contain unencrypted private keys. If a .conf file
-   has permissions 0644 (world-readable), any local unprivileged process can
-   steal the identity and impersonate the node.
-
-4. NAT Expiry Without PersistentKeepalive:
-   WireGuard is silent when idle. Stateful NAT firewalls purge UDP mappings after
-   30 to 120 seconds. Without `PersistentKeepalive = 25`, inbound sessions fail.
-
-5. Key Format Violations:
-   Invalid Base64 length, incorrect padding, or invalid byte length cause `wg`
-   and `wg-quick` to abort parsing.
+Program: WireGuard Mesh Configurator - Subnet Collision Detector & Auditor
+Programmer: Ethan Kilmer
+Last Modified: 11/08/2026
+Purpose: Audits WireGuard mesh configurations and .conf files for Cryptokey routing collisions, MTU misconfigurations, weak or mismatched Curve25519 keys, and insecure file permissions.
 """
 
+## ---------------------------------------------------------------------------
+## Standard Library Imports
+## ---------------------------------------------------------------------------
+## IP network manipulation module for CIDR calculation and overlap detection
 import ipaddress
+## Operating system interface for filesystem stats and permissions
 import os
+## Object-oriented filesystem path manipulation
 from pathlib import Path
+## Regular expression engine for parsing endpoints and tokens
 import re
+## File mode permission bit constants
 import stat
-from typing import Dict, List, Optional, Set, Tuple, Union
+## Type hinting annotations
+from typing import Dict, List, Optional, Set, Tuple, Union, Any
 
+## ---------------------------------------------------------------------------
+## Internal Model & Cryptographic Imports
+## ---------------------------------------------------------------------------
 from meshguard.models import (
     AuditFinding,
     AuditSeverity,
@@ -77,6 +44,7 @@ class MeshAuditor:
     """
 
     def __init__(self):
+        ## Accumulator list for diagnostic findings discovered during an audit run
         self.findings: List[AuditFinding] = []
 
     def audit_mesh_config(self, mesh: MeshConfig) -> List[AuditFinding]:
@@ -91,14 +59,23 @@ class MeshAuditor:
         5. MTU boundaries.
         6. NAT keepalive prerequisites.
         """
+        ## Clear findings list from any previous audit run
         self.findings.clear()
 
+        ## Tracking set to detect duplicate node names across the blueprint
         seen_names: Set[str] = set()
-        seen_ips: Dict[str, str] = {}  # ip -> node_name
-        all_networks: List[Tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, str]] = []
 
+        ## Tracking dictionary mapping IP string to node name for duplicate IP detection
+        seen_ips: Dict[str, str] = {}
+
+        ## Master list of all registered networks and their owning nodes for collision detection
+        all_networks: List[Tuple[Union[ipaddress.IPv4Network, ipaddress.IPv6Network], str]] = []
+
+        ## Iterate through each node in the mesh configuration
         for node in mesh.nodes:
-            # 1. Unique Node Names
+            ## ---------------------------------------------------------------
+            ## 1. Unique Node Names Check
+            ## ---------------------------------------------------------------
             if node.name in seen_names:
                 self.findings.append(
                     AuditFinding(
@@ -112,7 +89,10 @@ class MeshAuditor:
                 )
             seen_names.add(node.name)
 
-            # 2. Key Validation
+            ## ---------------------------------------------------------------
+            ## 2. Cryptographic Keypair Validation
+            ## ---------------------------------------------------------------
+            ## Verify public key format if present
             if node.public_key:
                 valid, msg = validate_key_format(node.public_key)
                 if not valid:
@@ -127,6 +107,7 @@ class MeshAuditor:
                         )
                     )
 
+            ## Verify private key format and mathematical alignment with public key
             if node.private_key:
                 valid, msg = validate_key_format(node.private_key)
                 if not valid:
@@ -141,7 +122,7 @@ class MeshAuditor:
                         )
                     )
                 else:
-                    # Check if derived public key matches declared public key
+                    ## Check if derived public key matches declared public key
                     try:
                         derived_pub = derive_public_key(node.private_key)
                         if node.public_key and derived_pub != node.public_key:
@@ -170,11 +151,16 @@ class MeshAuditor:
                             )
                         )
 
-            # 3. IP Assignment and Collision Checks
+            ## ---------------------------------------------------------------
+            ## 3. IP Assignment and Collision Checks
+            ## ---------------------------------------------------------------
             for ip_str in node.mesh_ips:
                 try:
+                    ## Parse IP interface string
                     iface = ipaddress.ip_interface(ip_str)
                     host_ip_str = str(iface.ip)
+
+                    ## Check for duplicate IP allocation
                     if host_ip_str in seen_ips:
                         self.findings.append(
                             AuditFinding(
@@ -192,7 +178,7 @@ class MeshAuditor:
                     else:
                         seen_ips[host_ip_str] = node.name
 
-                    # Record host network (/32 or /128)
+                    ## Record host network (/32 or /128) in master routing list
                     host_net = ipaddress.ip_network(
                         f"{iface.ip}/{32 if iface.version == 4 else 128}"
                     )
@@ -209,11 +195,14 @@ class MeshAuditor:
                         )
                     )
 
-            # 4. Extra Advertised Subnets Collision Check
+            ## ---------------------------------------------------------------
+            ## 4. Extra Advertised Subnets Collision Check
+            ## ---------------------------------------------------------------
             for extra in node.extra_allowed_ips:
                 try:
                     extra_net = ipaddress.ip_network(extra, strict=False)
-                    # Check for overlap with already registered networks
+
+                    ## Check for overlap with already registered networks
                     for existing_net, owner_node in all_networks:
                         if extra_net.overlaps(existing_net) and owner_node != node.name:
                             self.findings.append(
@@ -242,14 +231,18 @@ class MeshAuditor:
                         )
                     )
 
-            # 5. MTU Verification
+            ## ---------------------------------------------------------------
+            ## 5. MTU Verification
+            ## ---------------------------------------------------------------
             self._audit_mtu(node.mtu, target_name=node.name)
 
-            # 6. Endpoint & NAT Keepalive Verification
+            ## ---------------------------------------------------------------
+            ## 6. Endpoint & NAT Keepalive Verification
+            ## ---------------------------------------------------------------
             if node.endpoint:
                 self._audit_endpoint(node.endpoint, target_name=node.name)
             else:
-                # Behind NAT: check if keepalive is explicitly configured or will default
+                ## Behind NAT: check if keepalive is explicitly configured or will default
                 if node.persistent_keepalive is not None and node.persistent_keepalive > 30:
                     self.findings.append(
                         AuditFinding(
@@ -265,6 +258,7 @@ class MeshAuditor:
                         )
                     )
 
+        ## Return accumulated findings list
         return self.findings
 
     def audit_wireguard_config(
@@ -280,9 +274,12 @@ class MeshAuditor:
         4. Valid endpoints and ports.
         5. File system permission safety (if file_path provided).
         """
+        ## Target label for diagnostic reporting
         target = str(file_path) if file_path else "WireGuardConfig"
 
-        # 1. Interface Private Key
+        ## -------------------------------------------------------------------
+        ## 1. Interface Private Key Audit
+        ## -------------------------------------------------------------------
         if config.interface.private_key:
             valid, msg = validate_key_format(config.interface.private_key)
             if not valid:
@@ -297,21 +294,28 @@ class MeshAuditor:
                     )
                 )
 
-        # 2. MTU Verification
+        ## -------------------------------------------------------------------
+        ## 2. Interface MTU Verification
+        ## -------------------------------------------------------------------
         if config.interface.mtu:
             self._audit_mtu(config.interface.mtu, target_name=target)
 
-        # 3. File Permissions (POSIX security)
+        ## -------------------------------------------------------------------
+        ## 3. File Permissions Audit (POSIX security)
+        ## -------------------------------------------------------------------
         if file_path:
             self._audit_file_permissions(Path(file_path))
 
-        # 4. Peer AllowedIPs Overlap Analysis (Radix Trie Conflict Detection)
-        registered_peer_nets: List[Tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, str]] = []
+        ## -------------------------------------------------------------------
+        ## 4. Peer AllowedIPs Overlap Analysis (Radix Trie Conflict Detection)
+        ## -------------------------------------------------------------------
+        registered_peer_nets: List[Tuple[Union[ipaddress.IPv4Network, ipaddress.IPv6Network], str]] = []
 
+        ## Loop through each configured remote peer
         for idx, peer in enumerate(config.peers):
             peer_label = peer.comment or f"Peer #{idx + 1} ({peer.public_key[:8]}...)"
 
-            # Validate peer public key
+            ## Validate peer public key format
             valid, msg = validate_key_format(peer.public_key)
             if not valid:
                 self.findings.append(
@@ -325,16 +329,16 @@ class MeshAuditor:
                     )
                 )
 
-            # Check peer endpoint
+            ## Check peer endpoint socket syntax
             if peer.endpoint:
                 self._audit_endpoint(peer.endpoint, target_name=f"{target} -> {peer_label}")
 
-            # Check peer AllowedIPs
+            ## Check peer AllowedIPs for overlaps on this local interface
             for allowed_str in peer.allowed_ips:
                 try:
                     current_net = ipaddress.ip_network(allowed_str, strict=False)
 
-                    # Look for overlap with already registered peers on this interface
+                    ## Look for overlap with already registered peers on this interface
                     for prev_net, prev_peer in registered_peer_nets:
                         if current_net.overlaps(prev_net):
                             self.findings.append(
@@ -353,6 +357,7 @@ class MeshAuditor:
                                 )
                             )
 
+                    ## Record this peer's network route
                     registered_peer_nets.append((current_net, peer_label))
                 except ValueError as err:
                     self.findings.append(
@@ -366,16 +371,19 @@ class MeshAuditor:
                         )
                     )
 
+        ## Return list of findings for this configuration
         return self.findings
 
     def audit_directory(self, dir_path: Union[str, Path]) -> List[AuditFinding]:
         """
         Scans a directory for all .conf files and audits them individually and collectively.
         """
+        ## Ensure input path is a Path object
         p = Path(dir_path)
         if not p.is_dir():
             raise NotADirectoryError(f"Directory not found: {dir_path}")
 
+        ## Recursively locate all WireGuard configuration files (.conf)
         conf_files = list(p.rglob("*.conf"))
         if not conf_files:
             self.findings.append(
@@ -390,6 +398,7 @@ class MeshAuditor:
             )
             return self.findings
 
+        ## Audit each discovered configuration file
         for cf in conf_files:
             try:
                 wg_conf = self.parse_wg_conf_file(cf)
@@ -406,10 +415,12 @@ class MeshAuditor:
                     )
                 )
 
+        ## Return accumulated findings list
         return self.findings
 
     def _audit_mtu(self, mtu: int, target_name: str):
         """Verifies MTU sizing against physical and protocol constraints."""
+        ## IPv6 mandates a minimum link MTU of 1280 bytes (RFC 8200)
         if mtu < 1280:
             self.findings.append(
                 AuditFinding(
@@ -424,6 +435,7 @@ class MeshAuditor:
                     recommendation="Increase MTU to at least 1280 (recommended: 1420).",
                 )
             )
+        ## MTU of 1500 doesn't leave room for WireGuard UDP encapsulation overhead
         elif mtu == 1500:
             self.findings.append(
                 AuditFinding(
@@ -439,6 +451,7 @@ class MeshAuditor:
                     recommendation="Reduce MTU to 1420 (or 1440 for pure IPv4) to eliminate encapsulation fragmentation.",
                 )
             )
+        ## Jumbo frame MTU (> 1500 bytes) requires explicit underlay support
         elif mtu > 1500:
             self.findings.append(
                 AuditFinding(
@@ -456,7 +469,7 @@ class MeshAuditor:
 
     def _audit_endpoint(self, endpoint: str, target_name: str):
         """Validates that endpoint is a valid host:port string."""
-        # Split host and port
+        ## Endpoint must contain a colon separating host and UDP port
         if ":" not in endpoint:
             self.findings.append(
                 AuditFinding(
@@ -470,7 +483,7 @@ class MeshAuditor:
             )
             return
 
-        # Check IPv6 bracketed endpoint e.g. [2001:db8::1]:51820
+        ## Check IPv6 bracketed endpoint e.g. [2001:db8::1]:51820
         if endpoint.startswith("["):
             match = re.match(r"^\[([a-fA-F0-9:]+)\]:(\d+)$", endpoint)
             if not match:
@@ -487,6 +500,7 @@ class MeshAuditor:
                 return
             port = int(match.group(2))
         else:
+            ## Parse IPv4 or hostname endpoint
             parts = endpoint.rsplit(":", 1)
             try:
                 port = int(parts[1])
@@ -503,6 +517,7 @@ class MeshAuditor:
                 )
                 return
 
+        ## Port must be within valid 16-bit UDP port range
         if not (1 <= port <= 65535):
             self.findings.append(
                 AuditFinding(
@@ -521,7 +536,7 @@ class MeshAuditor:
             return
         try:
             mode = path.stat().st_mode
-            # Check if group or others have read or write permissions
+            ## Check if group or others have read or write permissions
             if mode & (stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH):
                 perm_octal = oct(stat.S_IMODE(mode))
                 self.findings.append(
@@ -538,7 +553,7 @@ class MeshAuditor:
                     )
                 )
         except OSError:
-            pass
+            pass  ## Non-POSIX systems
 
     @staticmethod
     def parse_wg_conf_file(path: Union[str, Path]) -> WireGuardConfig:
@@ -555,7 +570,10 @@ class MeshAuditor:
         Parses [Interface] and multiple [Peer] sections, handling comments,
         comma-separated addresses, and multi-value options.
         """
+        ## Current active configuration section header ('interface' or 'peer')
         current_section: Optional[str] = None
+
+        ## Dictionary accumulating parameters for the [Interface] section
         interface_params: Dict[str, Any] = {
             "private_key": "",
             "addresses": [],
@@ -568,27 +586,38 @@ class MeshAuditor:
             "post_down": [],
             "table": None,
         }
+
+        ## List of PeerConfig objects created while parsing [Peer] sections
         peers: List[PeerConfig] = []
+
+        ## Dictionary accumulating parameters for the active [Peer] section
         current_peer_params: Optional[Dict[str, Any]] = None
+
+        ## Holds any comment immediately preceding a section (e.g. node name comment)
         current_comment: Optional[str] = None
 
+        ## Process file content line-by-line
         for raw_line in content.splitlines():
             line = raw_line.strip()
-            # Handle comments
+
+            ## Skip blank lines
             if not line:
                 continue
+
+            ## Handle comments (# or ;)
             if line.startswith("#") or line.startswith(";"):
-                # Check for node annotation comments like "# Node: my-server"
+                ## Check for node annotation comments like "# Node: my-server"
                 if "node:" in line.lower():
                     current_comment = line.split(":", 1)[1].strip()
                 continue
 
-            # Section header
+            ## Section header parsing (e.g. [Interface] or [Peer])
             if line.startswith("[") and line.endswith("]"):
                 header = line[1:-1].strip().lower()
                 if header == "interface":
                     current_section = "interface"
                 elif header == "peer":
+                    ## If a peer block was already being populated, save it before starting new one
                     if current_peer_params is not None:
                         peers.append(MeshAuditor._build_peer(current_peer_params))
                     current_peer_params = {
@@ -605,16 +634,17 @@ class MeshAuditor:
                     current_section = None
                 continue
 
-            # Key = Value lines
+            ## Key = Value directive lines
             if "=" in line:
                 key, val = [p.strip() for p in line.split("=", 1)]
                 key_lower = key.lower()
 
+                ## Parse directives inside [Interface] section
                 if current_section == "interface":
                     if key_lower == "privatekey":
                         interface_params["private_key"] = val
                     elif key_lower == "address":
-                        # Can be comma-separated list of addresses
+                        ## Handle comma-separated list of addresses
                         for addr in val.split(","):
                             interface_params["addresses"].append(addr.strip())
                     elif key_lower == "listenport":
@@ -635,6 +665,7 @@ class MeshAuditor:
                     elif key_lower == "table":
                         interface_params["table"] = val
 
+                ## Parse directives inside [Peer] section
                 elif current_section == "peer" and current_peer_params is not None:
                     if key_lower == "publickey":
                         current_peer_params["public_key"] = val
@@ -648,15 +679,17 @@ class MeshAuditor:
                     elif key_lower == "persistentkeepalive":
                         current_peer_params["persistent_keepalive"] = int(val)
 
-        # Flush final peer
+        ## Flush final pending peer after end of loop
         if current_peer_params is not None:
             peers.append(MeshAuditor._build_peer(current_peer_params))
 
+        ## Construct InterfaceConfig and return complete WireGuardConfig
         interface = InterfaceConfig(**interface_params)
         return WireGuardConfig(interface=interface, peers=peers)
 
     @staticmethod
     def _build_peer(params: Dict[str, Any]) -> PeerConfig:
+        """Helper to instantiate PeerConfig from parsed parameter dictionary."""
         return PeerConfig(
             public_key=params["public_key"],
             allowed_ips=params["allowed_ips"],
