@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wireguard-mesh-configurator"
+version = "0.1.0"
+authors = [
+  { name = "Ethan Kilmer", email = "ethan@twu.software" }
+]
+description = "Zero-dependency WireGuard mesh configuration generator, topology visualizer, and subnet collision audit engine."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: System Administrators",
+  "Intended Audience :: Information Technology",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: MacOS",
+  "Operating System :: BSD",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: System :: Networking",
+  "Topic :: Security :: Cryptography"
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/Ethan-da-Tech-Wizard/wireguard-mesh-configurator"
+Repository = "https://github.com/Ethan-da-Tech-Wizard/wireguard-mesh-configurator.git"
+Issues = "https://github.com/Ethan-da-Tech-Wizard/wireguard-mesh-configurator/issues"
+
+[project.scripts]
+meshguard = "meshguard.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["meshguard*"]
