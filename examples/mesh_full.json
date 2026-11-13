@@ -3,31 +3,44 @@
   "topology": "full_mesh",
   "default_mtu": 1420,
   "default_port": 51820,
-  "global_preshared_key": "xK94lFwP8m7a1qZsO2vE9rT4yU1iO3pL5kG7jH8dF0s=",
+  "global_preshared_key": "<YOUR_PRESHARED_KEY>",
   "nodes": [
     {
       "name": "gateway-us-east",
-      "mesh_ips": ["10.100.0.1/24", "fd00:42::1/64"],
+      "mesh_ips": [
+        "10.100.0.1/24",
+        "fd00:42::1/64"
+      ],
       "endpoint": "vpn-east.example.com:51820",
       "listen_port": 51820,
       "private_key": "PLACEHOLDER_EAST_PRIVKEY",
       "public_key": "c/7y5J5iGqW+XNq63bHk5Zz0xO7T1rQ8uP3iK9vE0sA=",
-      "extra_allowed_ips": ["192.168.10.0/24"],
+      "extra_allowed_ips": [
+        "192.168.10.0/24"
+      ],
       "mtu": 1420
     },
     {
       "name": "gateway-us-west",
-      "mesh_ips": ["10.100.0.2/24", "fd00:42::2/64"],
+      "mesh_ips": [
+        "10.100.0.2/24",
+        "fd00:42::2/64"
+      ],
       "endpoint": "vpn-west.example.com:51820",
       "listen_port": 51820,
       "private_key": "PLACEHOLDER_WEST_PRIVKEY",
       "public_key": "d/8z6K6jHrX+YOr74cIl6Aa1yP8U2sR9vQ4jL0wF1tB=",
-      "extra_allowed_ips": ["192.168.20.0/24"],
+      "extra_allowed_ips": [
+        "192.168.20.0/24"
+      ],
       "mtu": 1420
     },
     {
       "name": "laptop-roaming",
-      "mesh_ips": ["10.100.0.3/24", "fd00:42::3/64"],
+      "mesh_ips": [
+        "10.100.0.3/24",
+        "fd00:42::3/64"
+      ],
       "endpoint": null,
       "listen_port": 51820,
       "private_key": "PLACEHOLDER_LAPTOP_PRIVKEY",
