@@ -8,12 +8,11 @@ version = "0.1.0"
 authors = [
   { name = "Ethan Kilmer", email = "ethan@twu.software" }
 ]
-description = "Zero-dependency WireGuard mesh configuration generator, topology visualizer, and subnet collision audit engine."
+description = "Project for generating and reviewing WireGuard mesh configurations."
 readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
 classifiers = [
-  "Development Status :: 4 - Beta",
   "Intended Audience :: System Administrators",
   "Intended Audience :: Information Technology",
   "License :: OSI Approved :: MIT License",
