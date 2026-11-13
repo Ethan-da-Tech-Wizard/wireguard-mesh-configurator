@@ -3,11 +3,14 @@
   "topology": "hub_and_spoke",
   "default_mtu": 1420,
   "default_port": 51820,
-  "global_preshared_key": "qW81eRtY3uIo5pAs7dFg9hJk1lZx3cVB5nMasdfghjk=",
+  "global_preshared_key": "<YOUR_PRESHARED_KEY>",
   "nodes": [
     {
       "name": "cloud-central-hub",
-      "mesh_ips": ["10.200.0.1/24", "fd00:42::1/64"],
+      "mesh_ips": [
+        "10.200.0.1/24",
+        "fd00:42::1/64"
+      ],
       "endpoint": "hub.cloud.example.com:51820",
       "listen_port": 51820,
       "private_key": "PLACEHOLDER_HUB_PRIVKEY",
@@ -17,19 +20,27 @@
     },
     {
       "name": "branch-office-router",
-      "mesh_ips": ["10.200.0.2/24", "fd00:42::2/64"],
+      "mesh_ips": [
+        "10.200.0.2/24",
+        "fd00:42::2/64"
+      ],
       "endpoint": null,
       "listen_port": 51820,
       "private_key": "PLACEHOLDER_BRANCH_PRIVKEY",
       "public_key": "bRanCh1234567890abcdefghijklmnopqrstuvwxyz=",
-      "extra_allowed_ips": ["192.168.100.0/24"],
+      "extra_allowed_ips": [
+        "192.168.100.0/24"
+      ],
       "is_hub": false,
       "persistent_keepalive": 25,
       "mtu": 1420
     },
     {
       "name": "workstation-alice",
-      "mesh_ips": ["10.200.0.3/24", "fd00:42::3/64"],
+      "mesh_ips": [
+        "10.200.0.3/24",
+        "fd00:42::3/64"
+      ],
       "endpoint": null,
       "listen_port": 51820,
       "private_key": "PLACEHOLDER_ALICE_PRIVKEY",
