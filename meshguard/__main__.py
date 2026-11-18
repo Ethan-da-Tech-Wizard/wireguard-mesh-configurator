@@ -1,9 +1,12 @@
-"""
-Program: WireGuard Mesh Configurator - Module CLI Execution Entrypoint
-Programmer: Ethan Kilmer
-Last Modified: 11/08/2026
-Purpose: Enable direct module execution via `python3 -m meshguard`, routing command-line arguments to the main CLI dispatcher.
-"""
+# ==============================================================================
+# Program: meshguard/__main__.py
+# Programmer: Ethan-da-Tech-Wizard
+# Course: CIS 156 / Advanced Systems
+# Last Modified: November 18, 2026
+# Purpose: Module CLI execution entrypoint enabling direct execution via
+#          `python3 -m meshguard`, routing command-line arguments to the
+#          main CLI parser and subcommand dispatcher.
+# ==============================================================================
 
 ## Standard system module for process exit codes and argument passing
 import sys

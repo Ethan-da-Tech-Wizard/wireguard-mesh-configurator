@@ -1,9 +1,12 @@
-"""
-Program: WireGuard Mesh Configurator - Subnet Collision Detector & Auditor
-Programmer: Ethan Kilmer
-Last Modified: 11/08/2026
-Purpose: Audits WireGuard mesh configurations and .conf files for Cryptokey routing collisions, MTU misconfigurations, weak or mismatched Curve25519 keys, and insecure file permissions.
-"""
+# ==============================================================================
+# Program: meshguard/auditor.py
+# Programmer: Ethan-da-Tech-Wizard
+# Course: CIS 156 / Advanced Systems
+# Last Modified: November 18, 2026
+# Purpose: Subnet collision detector and security auditor analyzing WireGuard
+#          mesh blueprints and configuration files for Cryptokey routing overlaps,
+#          MTU anomalies, weak keys, and insecure file permissions.
+# ==============================================================================
 
 ## ---------------------------------------------------------------------------
 ## Standard Library Imports

@@ -1,9 +1,12 @@
-"""
-Program: WireGuard Mesh Configurator - Command-Line Interface
-Programmer: Ethan Kilmer
-Last Modified: 11/08/2026
-Purpose: Command-line interface dispatcher supporting mesh blueprint initialization, pure-Python key generation, configuration compilation, routing collision auditing, topology visualization, and Linux systemd service unit export.
-"""
+# ==============================================================================
+# Program: meshguard/cli.py
+# Programmer: Ethan-da-Tech-Wizard
+# Course: CIS 156 / Advanced Systems
+# Last Modified: November 18, 2026
+# Purpose: Command-line interface dispatcher supporting mesh blueprint initialization,
+#          pure-Python key generation, configuration compilation, routing collision
+#          auditing, topology visualization, and Linux systemd service unit export.
+# ==============================================================================
 
 ## ---------------------------------------------------------------------------
 ## Standard Library Imports

@@ -1,9 +1,12 @@
-"""
-Program: WireGuard Mesh Configurator - ASCII Topology Visualizer
-Programmer: Ethan Kilmer
-Last Modified: 11/08/2026
-Purpose: Renders terminal-friendly ASCII diagrams, node inventory tables, connectivity graphs, and routing matrices for multi-node WireGuard networks.
-"""
+# ==============================================================================
+# Program: meshguard/visualizer.py
+# Programmer: Ethan-da-Tech-Wizard
+# Course: CIS 156 / Advanced Systems
+# Last Modified: November 18, 2026
+# Purpose: ASCII topology visualizer rendering terminal-friendly diagrams,
+#          node inventory tables, direct and hub-routed connectivity graphs,
+#          and longest-prefix routing matrices for multi-node WireGuard meshes.
+# ==============================================================================
 
 ## ---------------------------------------------------------------------------
 ## Standard Library Imports
