@@ -1,7 +1,6 @@
 # ==============================================================================
 # Program: meshguard/models.py
 # Programmer: Ethan-da-Tech-Wizard
-# Course: CIS 156 / Advanced Systems
 # Last Modified: November 18, 2026
 # Purpose: Core data models representing WireGuard interfaces, peer blocks,
 #          mesh blueprints, network node configurations, and audit diagnostic

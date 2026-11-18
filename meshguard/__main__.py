@@ -1,7 +1,6 @@
 # ==============================================================================
 # Program: meshguard/__main__.py
 # Programmer: Ethan-da-Tech-Wizard
-# Course: CIS 156 / Advanced Systems
 # Last Modified: November 18, 2026
 # Purpose: Module CLI execution entrypoint enabling direct execution via
 #          `python3 -m meshguard`, routing command-line arguments to the
