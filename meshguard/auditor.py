@@ -1,7 +1,6 @@
 # ==============================================================================
 # Program: meshguard/auditor.py
 # Programmer: Ethan-da-Tech-Wizard
-# Course: CIS 156 / Advanced Systems
 # Last Modified: November 18, 2026
 # Purpose: Subnet collision detector and security auditor analyzing WireGuard
 #          mesh blueprints and configuration files for Cryptokey routing overlaps,

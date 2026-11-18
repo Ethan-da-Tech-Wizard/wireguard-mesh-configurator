@@ -1,7 +1,6 @@
 # ==============================================================================
 # Program: meshguard/__init__.py
 # Programmer: Ethan-da-Tech-Wizard
-# Course: CIS 156 / Advanced Systems
 # Last Modified: November 18, 2026
 # Purpose: Expose primary public API classes and functions for MeshGuard, a
 #          zero-dependency WireGuard mesh orchestrator, auditor, and visualizer.

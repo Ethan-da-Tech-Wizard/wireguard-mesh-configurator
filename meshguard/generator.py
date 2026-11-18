@@ -1,7 +1,6 @@
 # ==============================================================================
 # Program: meshguard/generator.py
 # Programmer: Ethan-da-Tech-Wizard
-# Course: CIS 156 / Advanced Systems
 # Last Modified: November 18, 2026
 # Purpose: Network topology compiler synthesizing mathematically synchronized,
 #          peer-consistent WireGuard configurations for Full-Mesh and Hub-and-Spoke

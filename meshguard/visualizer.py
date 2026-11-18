@@ -1,7 +1,6 @@
 # ==============================================================================
 # Program: meshguard/visualizer.py
 # Programmer: Ethan-da-Tech-Wizard
-# Course: CIS 156 / Advanced Systems
 # Last Modified: November 18, 2026
 # Purpose: ASCII topology visualizer rendering terminal-friendly diagrams,
 #          node inventory tables, direct and hub-routed connectivity graphs,

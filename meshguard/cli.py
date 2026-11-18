@@ -1,7 +1,6 @@
 # ==============================================================================
 # Program: meshguard/cli.py
 # Programmer: Ethan-da-Tech-Wizard
-# Course: CIS 156 / Advanced Systems
 # Last Modified: November 18, 2026
 # Purpose: Command-line interface dispatcher supporting mesh blueprint initialization,
 #          pure-Python key generation, configuration compilation, routing collision

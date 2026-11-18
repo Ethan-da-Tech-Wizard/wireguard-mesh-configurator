@@ -1,7 +1,6 @@
 # ==============================================================================
 # Program: tests/test_meshguard.py
 # Programmer: Ethan-da-Tech-Wizard
-# Course: CIS 156 / Advanced Systems
 # Last Modified: November 18, 2026
 # Purpose: Comprehensive unit and integration test suite verifying RFC 7748
 #          Curve25519 cryptography, data models, full-mesh and hub-spoke synthesis,

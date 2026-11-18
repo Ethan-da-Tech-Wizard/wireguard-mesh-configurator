@@ -1,7 +1,6 @@
 # ==============================================================================
 # Program: meshguard/crypto.py
 # Programmer: Ethan-da-Tech-Wizard
-# Course: CIS 156 / Advanced Systems
 # Last Modified: November 18, 2026
 # Purpose: Pure-Python RFC 7748 Curve25519 cryptographic primitives, Montgomery
 #          ladder scalar multiplication, bit-clamping, CSPRNG keypair and
