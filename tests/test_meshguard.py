@@ -1,8 +1,10 @@
+# Program: wireguard-mesh-configurator - test_meshguard.py
+# Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+# Last Modified: 2026-11-18
+# Purpose: Comprehensive unit and integration test suite verifying RFC 7748 Curve25519 cryptography, data models, full-mesh and hub-spoke synthesis, cryptokey routing collision detection, MTU boundaries, visualizer diagrams, and CLI commands.
+
 """
-Program: WireGuard Mesh Configurator - Test Suite
-Programmer: Ethan Kilmer
-Last Modified: 11/08/2026
-Purpose: Comprehensive unit and integration test suite verifying RFC 7748 Curve25519 cryptography, data models, full-mesh and hub-spoke synthesis, cryptokey routing collision detection, MTU boundaries, visualizer diagrams, and CLI commands.
+Comprehensive unit and integration test suite verifying RFC 7748 Curve25519 cryptography, data models, full-mesh and hub-spoke synthesis, cryptokey routing collision detection, MTU boundaries, visualizer diagrams, and CLI commands.
 """
 
 ## ---------------------------------------------------------------------------
@@ -241,6 +243,7 @@ class TestGenerator(unittest.TestCase):
     """Verifies mesh generation algorithms."""
 
     def setUp(self):
+        """Runs before each test: makes three fresh keypairs to build meshes from."""
         ## Pre-generate fresh keypairs for testing
         self.priv1, self.pub1 = generate_keypair()
         self.priv2, self.pub2 = generate_keypair()
@@ -377,6 +380,8 @@ class TestAuditor(unittest.TestCase):
     """Verifies audit checks, collision detection, and MTU verification."""
 
     def setUp(self):
+        """Runs before each test: makes two fresh keypairs for the audit scenarios."""
+        ## Fresh keys so tests never share state
         self.priv1, self.pub1 = generate_keypair()
         self.priv2, self.pub2 = generate_keypair()
 

@@ -1,8 +1,10 @@
+# Program: wireguard-mesh-configurator - visualizer.py
+# Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+# Last Modified: 2026-11-18
+# Purpose: Renders terminal-friendly ASCII diagrams, node inventory tables, connectivity graphs, and routing matrices for multi-node WireGuard networks.
+
 """
-Program: WireGuard Mesh Configurator - ASCII Topology Visualizer
-Programmer: Ethan Kilmer
-Last Modified: 11/08/2026
-Purpose: Renders terminal-friendly ASCII diagrams, node inventory tables, connectivity graphs, and routing matrices for multi-node WireGuard networks.
+Renders terminal-friendly ASCII diagrams, node inventory tables, connectivity graphs, and routing matrices for multi-node WireGuard networks.
 """
 
 ## ---------------------------------------------------------------------------
@@ -23,6 +25,7 @@ class MeshVisualizer:
     """
 
     def __init__(self, config: MeshConfig):
+        """Remember the mesh configuration that the render methods will draw."""
         ## Store the mesh blueprint configuration to be rendered
         self.config = config
 
