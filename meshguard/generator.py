@@ -1,8 +1,10 @@
+# Program: wireguard-mesh-configurator - generator.py
+# Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+# Last Modified: 2026-11-18
+# Purpose: Synthesizes mathematically synchronized, peer-consistent WireGuard configurations for Full-Mesh and Hub-and-Spoke topologies, handling NAT traversal, AllowedIPs host-masking, and Linux systemd exports.
+
 """
-Program: WireGuard Mesh Configurator - Network Topology Synthesizer
-Programmer: Ethan Kilmer
-Last Modified: 11/08/2026
-Purpose: Synthesizes mathematically synchronized, peer-consistent WireGuard configurations for Full-Mesh and Hub-and-Spoke topologies, handling NAT traversal, AllowedIPs host-masking, and Linux systemd exports.
+Synthesizes mathematically synchronized, peer-consistent WireGuard configurations for Full-Mesh and Hub-and-Spoke topologies, handling NAT traversal, AllowedIPs host-masking, and Linux systemd exports.
 """
 
 ## ---------------------------------------------------------------------------

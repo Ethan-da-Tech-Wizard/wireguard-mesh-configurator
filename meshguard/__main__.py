@@ -1,8 +1,10 @@
+# Program: wireguard-mesh-configurator - __main__.py
+# Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+# Last Modified: 2026-11-18
+# Purpose: Enable direct module execution via `python3 -m meshguard`, routing command-line arguments to the main CLI dispatcher.
+
 """
-Program: WireGuard Mesh Configurator - Module CLI Execution Entrypoint
-Programmer: Ethan Kilmer
-Last Modified: 11/08/2026
-Purpose: Enable direct module execution via `python3 -m meshguard`, routing command-line arguments to the main CLI dispatcher.
+Enable direct module execution via `python3 -m meshguard`, routing command-line arguments to the main CLI dispatcher.
 """
 
 ## Standard system module for process exit codes and argument passing

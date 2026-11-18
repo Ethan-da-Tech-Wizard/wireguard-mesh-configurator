@@ -1,8 +1,10 @@
+# Program: wireguard-mesh-configurator - crypto.py
+# Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+# Last Modified: 2026-11-18
+# Purpose: Pure-Python RFC 7748 Curve25519 keypair generation, public key derivation via Montgomery ladder, bit-clamping, preshared key generation, and WireGuard key validation without external dependencies.
+
 """
-Program: WireGuard Mesh Configurator - Pure-Python RFC 7748 Curve25519 Engine
-Programmer: Ethan Kilmer
-Last Modified: 11/08/2026
-Purpose: Pure-Python RFC 7748 Curve25519 keypair generation, public key derivation via Montgomery ladder, bit-clamping, preshared key generation, and WireGuard key validation without external dependencies.
+Pure-Python RFC 7748 Curve25519 keypair generation, public key derivation via Montgomery ladder, bit-clamping, preshared key generation, and WireGuard key validation without external dependencies.
 """
 
 ## ---------------------------------------------------------------------------

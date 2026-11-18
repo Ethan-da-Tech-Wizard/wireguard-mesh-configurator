@@ -1,8 +1,10 @@
+# Program: wireguard-mesh-configurator - __init__.py
+# Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+# Last Modified: 2026-11-18
+# Purpose: Expose primary public API classes and functions for MeshGuard, a zero-dependency WireGuard mesh orchestrator, auditor, and visualizer.
+
 """
-Program: WireGuard Mesh Configurator - Package Initialization
-Programmer: Ethan Kilmer
-Last Modified: 11/08/2026
-Purpose: Expose primary public API classes and functions for MeshGuard, a zero-dependency WireGuard mesh orchestrator, auditor, and visualizer.
+Expose primary public API classes and functions for MeshGuard, a zero-dependency WireGuard mesh orchestrator, auditor, and visualizer.
 """
 
 ## ---------------------------------------------------------------------------

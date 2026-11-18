@@ -1,8 +1,10 @@
+# Program: wireguard-mesh-configurator - auditor.py
+# Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+# Last Modified: 2026-11-18
+# Purpose: Audits WireGuard mesh configurations and .conf files for Cryptokey routing collisions, MTU misconfigurations, weak or mismatched Curve25519 keys, and insecure file permissions.
+
 """
-Program: WireGuard Mesh Configurator - Subnet Collision Detector & Auditor
-Programmer: Ethan Kilmer
-Last Modified: 11/08/2026
-Purpose: Audits WireGuard mesh configurations and .conf files for Cryptokey routing collisions, MTU misconfigurations, weak or mismatched Curve25519 keys, and insecure file permissions.
+Audits WireGuard mesh configurations and .conf files for Cryptokey routing collisions, MTU misconfigurations, weak or mismatched Curve25519 keys, and insecure file permissions.
 """
 
 ## ---------------------------------------------------------------------------
@@ -44,6 +46,7 @@ class MeshAuditor:
     """
 
     def __init__(self):
+        """Create an auditor with an empty list of findings."""
         ## Accumulator list for diagnostic findings discovered during an audit run
         self.findings: List[AuditFinding] = []
 
