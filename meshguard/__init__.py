@@ -1,9 +1,13 @@
-"""
-Program: WireGuard Mesh Configurator - Package Initialization
-Programmer: Ethan Kilmer
-Last Modified: 11/08/2026
-Purpose: Expose primary public API classes and functions for MeshGuard, a zero-dependency WireGuard mesh orchestrator, auditor, and visualizer.
-"""
+# ==============================================================================
+# Program: meshguard/__init__.py
+# Programmer: Ethan-da-Tech-Wizard
+# Course: CIS 156 / Advanced Systems
+# Last Modified: November 18, 2026
+# Purpose: Expose primary public API classes and functions for MeshGuard, a
+#          zero-dependency WireGuard mesh orchestrator, auditor, and visualizer.
+#          Exports data models, cryptographic primitives, compilation generators,
+#          collision auditors, and ASCII topology rendering utilities.
+# ==============================================================================
 
 ## ---------------------------------------------------------------------------
 ## Import core data models representing WireGuard configurations, network
@@ -50,7 +54,7 @@ from meshguard.visualizer import MeshVisualizer
 ## Semantic version string for release tracking
 __version__ = "0.1.0"
 ## Author attribution and copyright ownership
-__author__ = "Ethan Kilmer"
+__author__ = "Ethan-da-Tech-Wizard"
 ## Open-source software license descriptor
 __license__ = "MIT"
 

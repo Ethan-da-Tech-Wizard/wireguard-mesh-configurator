@@ -1,9 +1,12 @@
-"""
-Program: WireGuard Mesh Configurator - Data Models & Architecture
-Programmer: Ethan Kilmer
-Last Modified: 11/08/2026
-Purpose: Core data models representing WireGuard interfaces, peers, mesh blueprints, network nodes, and audit findings with serialization to wg-quick and systemd-networkd formats.
-"""
+# ==============================================================================
+# Program: meshguard/models.py
+# Programmer: Ethan-da-Tech-Wizard
+# Course: CIS 156 / Advanced Systems
+# Last Modified: November 18, 2026
+# Purpose: Core data models representing WireGuard interfaces, peer blocks,
+#          mesh blueprints, network node configurations, and audit diagnostic
+#          findings with serialization to wg-quick and systemd-networkd formats.
+# ==============================================================================
 
 ## ---------------------------------------------------------------------------
 ## Standard Library Imports
