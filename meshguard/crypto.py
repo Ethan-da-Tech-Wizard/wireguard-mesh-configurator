@@ -11,6 +11,8 @@
 ## Standard Library Imports
 ## ---------------------------------------------------------------------------
 ## Binary-to-ASCII encoding library for Base64 serialization of 32-byte keys
+"""Pure-Python RFC 7748 Curve25519 (X25519) primitives plus WireGuard-style Base64 key generation and validation."""
+
 import base64
 ## Operating system interface for secure entropy access
 import os

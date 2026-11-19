@@ -12,6 +12,8 @@
 ## Standard Library Imports
 ## ---------------------------------------------------------------------------
 ## IP network manipulation module for CIDR calculation and host mask conversions
+"""Compiles a MeshConfig into per-node WireGuard configs (full-mesh or hub-and-spoke) and writes them, plus systemd unit export."""
+
 import ipaddress
 ## JSON parsing module for serializing and deserializing mesh blueprints
 import json

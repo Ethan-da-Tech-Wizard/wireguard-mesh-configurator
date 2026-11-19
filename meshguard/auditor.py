@@ -11,6 +11,8 @@
 ## Standard Library Imports
 ## ---------------------------------------------------------------------------
 ## IP network manipulation module for CIDR calculation and overlap detection
+"""Audits MeshConfig blueprints and rendered WireGuard configs: duplicate names/IPs, key validity, AllowedIPs collisions, MTU, and file permissions."""
+
 import ipaddress
 ## Operating system interface for filesystem stats and permissions
 import os
@@ -46,6 +48,7 @@ class MeshAuditor:
     """
 
     def __init__(self):
+        """Create an auditor with an empty findings list."""
         ## Accumulator list for diagnostic findings discovered during an audit run
         self.findings: List[AuditFinding] = []
 

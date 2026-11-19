@@ -5,3 +5,5 @@
 # Purpose: Package initialization for MeshGuard test suite, exposing test
 #          namespaces for unit, integration, and cryptographic validation suites.
 # ==============================================================================
+
+"""Test package marker for the MeshGuard unittest suite."""

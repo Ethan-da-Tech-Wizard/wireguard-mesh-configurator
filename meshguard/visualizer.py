@@ -11,6 +11,8 @@
 ## Standard Library Imports
 ## ---------------------------------------------------------------------------
 ## Type hinting annotations
+"""Renders ASCII node tables, topology diagrams and routing matrices for a MeshConfig."""
+
 from typing import Dict, List, Optional
 
 ## ---------------------------------------------------------------------------
@@ -25,6 +27,7 @@ class MeshVisualizer:
     """
 
     def __init__(self, config: MeshConfig):
+        """Bind the visualizer to the MeshConfig it will render."""
         ## Store the mesh blueprint configuration to be rendered
         self.config = config
 
