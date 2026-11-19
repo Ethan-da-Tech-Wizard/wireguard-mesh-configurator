@@ -13,6 +13,12 @@
 ## Command-line argument parsing library
 """MeshGuard command-line interface: init, keygen, generate, audit, visualize and systemd export subcommands."""
 
+# Role: console entry point (python -m meshguard / the `meshguard` script). Each
+# cmd_* function below is one subcommand; they call into crypto (keys), generator
+# (blueprint -> .conf files), auditor (collision/MTU/key checks) and visualizer.
+# Exit codes: 0 success, 1 any error or an audit with CRITICAL/ERROR findings, so
+# the audit subcommand can gate CI or a deploy script.
+# Zero third-party dependencies: key generation is done in pure Python.
 import argparse
 ## JSON data serialization and parsing
 import json
@@ -70,6 +76,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Network topology structure (default: full_mesh)",
     )
     init_parser.add_argument(
+        # Minimum is enforced in cmd_init, not here, so `--nodes 1` is silently raised to 2.
         "--nodes",
         "-n",
         type=int,
@@ -90,6 +97,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Generate a 32-byte symmetric PresharedKey (PSK) instead of a keypair",
     )
     keygen_parser.add_argument(
+        # Lets an operator recompute the public key for a private key they already have,
+        # e.g. to fill in a peer's blueprint entry. The private key appears in shell history
+        # when passed this way (known trade-off of a CLI argument).
         "--derive-public",
         type=str,
         metavar="PRIVATE_KEY",
@@ -137,6 +147,8 @@ def build_parser() -> argparse.ArgumentParser:
         "audit",
         help="Audit configurations or blueprints for subnet collisions, MTU risks, and key errors",
     )
+    # Exactly one audit target must be named: a blueprint (checked before configs are
+    # generated), one rendered .conf, or a whole directory of rendered .conf files.
     audit_group = audit_parser.add_mutually_exclusive_group(required=True)
     audit_group.add_argument(
         "--config",
@@ -196,27 +208,38 @@ def cmd_init(args: argparse.Namespace) -> int:
     out_path = Path(args.output)
 
     ## Guard against accidental overwrite of an existing blueprint
+    # Never clobber: a blueprint holds private keys, and overwriting it would
+    # silently orphan the keys already deployed to peers.
     if out_path.exists():
         print(f"Error: Target file '{out_path}' already exists. Refusing to overwrite.", file=sys.stderr)
         return 1
 
     nodes = []
     ## Guarantee a minimum of 2 nodes for meaningful mesh networking
+    # A mesh needs at least two peers to have any link.
     num_nodes = max(2, args.nodes)
 
     ## Generate sample nodes with fresh Curve25519 keypairs
     for i in range(1, num_nodes + 1):
         priv, pub = generate_keypair()
+        # In hub_and_spoke the first node is the hub; in full_mesh nobody is.
         is_hub = (args.topology == "hub_and_spoke" and i == 1)
         node_def = {
             "name": f"node-{i:02d}" if not is_hub else "hub-gateway",
+            # Private IPv4 (10.100.0.0/24) plus an IPv6 ULA (fd00:42::/64) inside the tunnel.
             "mesh_ips": [f"10.100.0.{i}/24", f"fd00:42::{i}/64"],
+            # Only nodes that must be dialled get an endpoint: every node in a full mesh, but
+            # in hub_and_spoke just the hub (spokes only dial out, so they need no public endpoint).
+            # vpn.example.com is a placeholder to be edited; ports increment per node so the
+            # sample works if all nodes run on one host.
             "endpoint": f"vpn.example.com:{51820 + i - 1}" if (is_hub or args.topology == "full_mesh") else None,
             "listen_port": 51820,
             "private_key": priv,
             "public_key": pub,
             "is_hub": is_hub,
+            # The hub advertises a sample LAN behind it, showing how routed subnets are declared.
             "extra_allowed_ips": [] if not is_hub else ["192.168.10.0/24"],
+            # 1420 = 1500 Ethernet minus 80 bytes of WireGuard overhead (worst case, IPv6 outer).
             "mtu": 1420,
             "dns": ["1.1.1.1", "8.8.8.8"] if not is_hub else [],
         }
@@ -228,11 +251,13 @@ def cmd_init(args: argparse.Namespace) -> int:
         "topology": args.topology,
         "default_mtu": 1420,
         "default_port": 51820,
+        # One shared PSK adds a symmetric layer on top of Curve25519 (post-quantum hedge).
         "global_preshared_key": generate_preshared_key(),
         "nodes": nodes,
     }
 
     ## Write formatted JSON to the designated output path
+    # The file contains private keys in plain text: keep it out of version control.
     out_path.write_text(json.dumps(sample_mesh, indent=2) + "\n", encoding="utf-8")
     print(f"✓ Initialized sample {args.topology} blueprint with {num_nodes} nodes at: {out_path}")
     print("  Run 'meshguard visualize --config mesh.json' to view topology.")
@@ -242,6 +267,7 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 def cmd_keygen(args: argparse.Namespace) -> int:
     """Handles key generation and derivation."""
+    # Mode precedence: --psk first, then --derive-public, otherwise a fresh keypair.
     ## 1. PresharedKey generation mode
     if args.psk:
         psk = generate_preshared_key()
@@ -279,6 +305,8 @@ def cmd_generate(args: argparse.Namespace) -> int:
     include_systemd = not args.no_systemd
 
     ## Execute file export
+    # export_configs writes one .conf per node (plus optional systemd/networkd units)
+    # and returns {node name: path}. I/O errors here propagate as exceptions.
     results = gen.export_configs(
         output_dir=out_dir,
         interface_name=args.interface,
@@ -334,6 +362,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
         return 0
 
     ## Compute summary metrics by severity
+    # Counts by severity drive both the summary line and the exit code below.
     critical_count = sum(1 for f in findings if f.severity == AuditSeverity.CRITICAL)
     error_count = sum(1 for f in findings if f.severity == AuditSeverity.ERROR)
     warn_count = sum(1 for f in findings if f.severity == AuditSeverity.WARNING)
@@ -350,6 +379,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
         print("-" * 70)
 
     ## Fail with non-zero exit code if CRITICAL or ERROR findings exist
+    # Warnings and info are advisory only; CRITICAL and ERROR fail the command (exit 1).
     if critical_count > 0 or error_count > 0:
         return 1
     return 0
