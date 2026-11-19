@@ -42,6 +42,13 @@ from meshguard.crypto import (
 )
 
 
+# Finding ids group by area: NODE-* node identity, KEY-* key material, IP-* addressing
+# and routing. Severity convention: CRITICAL = the mesh will misroute or an identity
+# is ambiguous, ERROR = a config will not work as written, WARNING/INFO = advisory.
+# cli.py exits non-zero only for CRITICAL and ERROR.
+# Why overlaps matter: WireGuard 'cryptokey routing' picks the peer by matching the
+# destination against every peer's AllowedIPs, so two peers claiming overlapping
+# ranges make delivery ambiguous (traffic can go to the wrong peer).
 class MeshAuditor:
     """
     Diagnostic analysis engine for WireGuard configurations and meshes.
@@ -65,6 +72,8 @@ class MeshAuditor:
         6. NAT keepalive prerequisites.
         """
         ## Clear findings list from any previous audit run
+        # The instance is reusable across audits; stale findings from a previous run
+        # must never leak into this report.
         self.findings.clear()
 
         ## Tracking set to detect duplicate node names across the blueprint
@@ -81,6 +90,8 @@ class MeshAuditor:
             ## ---------------------------------------------------------------
             ## 1. Unique Node Names Check
             ## ---------------------------------------------------------------
+            # The generator keys configs by node name and writes each node into its own
+            # directory, so a duplicate name would make one node's output replace the other's.
             if node.name in seen_names:
                 self.findings.append(
                     AuditFinding(
@@ -129,6 +140,8 @@ class MeshAuditor:
                 else:
                     ## Check if derived public key matches declared public key
                     try:
+                        # Cheapest way to catch a copy-paste error: the public key must be exactly what
+                        # the private key derives to, otherwise peers will reject the handshake.
                         derived_pub = derive_public_key(node.private_key)
                         if node.public_key and derived_pub != node.public_key:
                             self.findings.append(
@@ -184,6 +197,8 @@ class MeshAuditor:
                         seen_ips[host_ip_str] = node.name
 
                     ## Record host network (/32 or /128) in master routing list
+                    # Each interface address is also registered as a single-host network (/32 or
+                    # /128) so later AllowedIPs entries are checked against concrete node addresses.
                     host_net = ipaddress.ip_network(
                         f"{iface.ip}/{32 if iface.version == 4 else 128}"
                     )
@@ -205,10 +220,13 @@ class MeshAuditor:
             ## ---------------------------------------------------------------
             for extra in node.extra_allowed_ips:
                 try:
+                    # strict=False accepts host bits set (e.g. 192.168.1.5/24) and normalises to the
+                    # network, matching how WireGuard itself interprets AllowedIPs.
                     extra_net = ipaddress.ip_network(extra, strict=False)
 
                     ## Check for overlap with already registered networks
                     for existing_net, owner_node in all_networks:
+                        # A node overlapping its own addresses is fine; only another node's range is a collision.
                         if extra_net.overlaps(existing_net) and owner_node != node.name:
                             self.findings.append(
                                 AuditFinding(
