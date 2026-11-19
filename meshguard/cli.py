@@ -11,6 +11,8 @@
 ## Standard Library Imports
 ## ---------------------------------------------------------------------------
 ## Command-line argument parsing library
+"""MeshGuard command-line interface: init, keygen, generate, audit, visualize and systemd export subcommands."""
+
 import argparse
 ## JSON data serialization and parsing
 import json

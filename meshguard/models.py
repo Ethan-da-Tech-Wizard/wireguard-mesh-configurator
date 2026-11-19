@@ -11,6 +11,8 @@
 ## Standard Library Imports
 ## ---------------------------------------------------------------------------
 ## Dataclass decorator and field helper for clean, declarative data structures
+"""Dataclasses and enums for interfaces, peers, nodes, mesh blueprints and audit findings, with wg-quick serialization."""
+
 from dataclasses import dataclass, field
 ## Enumeration class for strongly-typed severity and topology categories
 from enum import Enum

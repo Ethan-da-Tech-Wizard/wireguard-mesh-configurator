@@ -12,6 +12,8 @@
 ## Import core data models representing WireGuard configurations, network
 ## topologies, and audit diagnostic findings.
 ## ---------------------------------------------------------------------------
+"""MeshGuard public API: re-exports the data models, Curve25519 key helpers, config generators, auditor and visualizer."""
+
 from meshguard.models import (
     AuditFinding,
     AuditSeverity,

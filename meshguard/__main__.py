@@ -8,6 +8,8 @@
 # ==============================================================================
 
 ## Standard system module for process exit codes and argument passing
+"""Entry point for `python3 -m meshguard`; delegates to meshguard.cli.main."""
+
 import sys
 
 ## Import the primary command-line parser and execution dispatcher

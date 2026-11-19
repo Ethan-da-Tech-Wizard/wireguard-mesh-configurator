@@ -12,6 +12,8 @@
 ## Standard Library Imports
 ## ---------------------------------------------------------------------------
 ## Binary encoding utilities for base64 and hexadecimal conversions
+"""Unit and integration tests for MeshGuard crypto, models, generation, auditing, visualization and CLI."""
+
 import base64
 import binascii
 ## In-memory string streams for capturing standard output in tests
@@ -244,6 +246,7 @@ class TestGenerator(unittest.TestCase):
     """Verifies mesh generation algorithms."""
 
     def setUp(self):
+        """Generate fresh keypairs before each test."""
         ## Pre-generate fresh keypairs for testing
         self.priv1, self.pub1 = generate_keypair()
         self.priv2, self.pub2 = generate_keypair()
@@ -380,6 +383,7 @@ class TestAuditor(unittest.TestCase):
     """Verifies audit checks, collision detection, and MTU verification."""
 
     def setUp(self):
+        """Generate two fresh keypairs before each test."""
         self.priv1, self.pub1 = generate_keypair()
         self.priv2, self.pub2 = generate_keypair()
 
