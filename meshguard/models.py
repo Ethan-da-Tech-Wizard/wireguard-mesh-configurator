@@ -309,7 +309,7 @@ class Node:
     Attributes:
         name: Unique alphanumeric hostname/identifier (e.g. 'edge-router', 'laptop-ethan').
         mesh_ips: Virtual IP addresses within the overlay network (e.g. ['10.100.0.1/24']).
-        endpoint: Publicly accessible UDP socket (e.g. 'vpn.twu.software:51820'). None if behind NAT.
+        endpoint: Publicly accessible UDP socket (e.g. 'vpn.example.com:51820'). None if behind NAT.
         listen_port: UDP port on which this node binds (default 51820).
         public_key: 44-character Base64 Curve25519 public key.
         private_key: Optional local private key.

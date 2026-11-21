@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "wireguard-mesh-configurator"
 version = "0.1.0"
 authors = [
-  { name = "Ethan Kilmer", email = "ethan@twu.software" }
+  { name = "Ethan-da-Tech-Wizard" }
 ]
 description = "Project for generating and reviewing WireGuard mesh configurations."
 readme = "README.md"
