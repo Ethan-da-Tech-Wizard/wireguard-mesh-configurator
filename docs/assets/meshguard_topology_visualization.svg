@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 640" width="860" height="640">
+  <defs>
+    <style>
+      .terminal-bg { fill: #181825; }
+      .terminal-header { fill: #11111b; }
+      .terminal-title { fill: #a6adc8; font-family: monospace, monospace; font-size: 13px; font-weight: bold; text-anchor: middle; }
+      .terminal-text { fill: #cdd6f4; font-family: monospace, monospace; font-size: 13px; }
+      .btn-red { fill: #f38ba8; }
+      .btn-yellow { fill: #f9e2af; }
+      .btn-green { fill: #a6e3a1; }
+    </style>
+  </defs>
+  <rect class="terminal-bg" x="0" y="0" width="860" height="640" rx="10" ry="10" />
+  <path class="terminal-header" d="M 0 10 A 10 10 0 0 1 10 0 L 850 0 A 10 10 0 0 1 860 10 L 860 42 L 0 42 Z" />
+  <circle class="btn-red" cx="24" cy="21" r="6" />
+  <circle class="btn-yellow" cx="42" cy="21" r="6" />
+  <circle class="btn-green" cx="60" cy="21" r="6" />
+  <text class="terminal-title" x="430" y="26">WireGuard Mesh Topology &amp; Cryptokey Routing Visualizer</text>
+  <g class="terminal-text">
+    <text x="24" y="80">$ meshguard visualize --config mesh.json</text>
+    <text x="24" y="102">======================================================================</text>
+    <text x="24" y="124">=============== WIREGUARD MESH TOPOLOGY: HOMELAB-MESH ================</text>
+    <text x="24" y="146">              Topology Model: FULL_MESH | Total Nodes: 3              </text>
+    <text x="24" y="168">======================================================================</text>
+    <text x="24" y="190"></text>
+    <text x="24" y="212">NODE INVENTORY &amp; IP ALLOCATION TABLE</text>
+    <text x="24" y="234">──────────────────────────────────────────────────────────────────────</text>
+    <text x="24" y="256">Node Name        Overlay IP         Endpoint               Role</text>
+    <text x="24" y="278">──────────────────────────────────────────────────────────────────────</text>
+    <text x="24" y="300">gateway-node     127.0.0.1.1/24      vpn.example.com:51820  Hub (Relay)</text>
+    <text x="24" y="322">worker-01        127.0.0.1.2/24      198.51.100.12:51821    Spoke (Peer)</text>
+    <text x="24" y="344">worker-02        127.0.0.1.3/24      198.51.100.13:51822    Spoke (Peer)</text>
+    <text x="24" y="366">──────────────────────────────────────────────────────────────────────</text>
+    <text x="24" y="388"></text>
+    <text x="24" y="410">CONNECTIVITY GRAPH &amp; CRYPTOKEY ROUTING</text>
+    <text x="24" y="432">──────────────────────────────────────────────────────────────────────</text>
+    <text x="24" y="454">  [1] gateway-node (127.0.0.1.1/24) @ vpn.example.com:51820</text>
+    <text x="24" y="476">  [2] worker-01    (127.0.0.1.2/24) @ 198.51.100.12:51821</text>
+    <text x="24" y="498">  [3] worker-02    (127.0.0.1.3/24) @ 198.51.100.13:51822</text>
+    <text x="24" y="520"></text>
+    <text x="24" y="542">  Interconnection Graph:</text>
+    <text x="24" y="564">    gateway-node   ◄══════ (Direct P2P Encrypted UDP) ══════► worker-01</text>
+    <text x="24" y="586">    gateway-node   ◄══════ (Direct P2P Encrypted UDP) ══════► worker-02</text>
+    <text x="24" y="608">    worker-01      ◄══════ (Direct P2P Encrypted UDP) ══════► worker-02</text>
+  </g>
+</svg>
